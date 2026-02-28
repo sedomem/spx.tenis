@@ -329,7 +329,7 @@ function growHtml(p) {
   return '<span class="'+(p>=0?'up':'down')+'">'+(p>=0?'▲':'▼')+' '+Math.abs(p).toFixed(1)+'%</span>';
 }
 
-// ── GOOGLE SHEETS FETCH (fetch API + ham JSON parse)
+// ── GOOGLE SHEETS FETCH
 function fetchSheet(sheetName, callback) {
   var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
             '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(sheetName);
@@ -339,10 +339,14 @@ function fetchSheet(sheetName, callback) {
       return res.text();
     })
     .then(function(text) {
-      // GViz yaniti: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-      var match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
-      if (!match) throw new Error('GViz format hatasi: ' + sheetName);
-      var data = JSON.parse(match[1]);
+      // GViz yaniti: /*O_o*/
+google.visualization.Query.setResponse({version:'0.6',status:'ok',table:{...}});
+      // Son parantezi bul - greedy degil
+      var start = text.indexOf('({');
+      var end = text.lastIndexOf('});');
+      if (start === -1 || end === -1) throw new Error('GViz parse hatasi: ' + sheetName);
+      var jsonStr = text.slice(start + 1, end + 1);
+      var data = JSON.parse(jsonStr);
       callback(null, data);
     })
     .catch(function(err) {
