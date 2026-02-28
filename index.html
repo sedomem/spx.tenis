@@ -339,13 +339,19 @@ function fetchSheet(sheetName, callback) {
       return res.text();
     })
     .then(function(text) {
-      // GViz yaniti: /*O_o*/
-google.visualization.Query.setResponse({version:'0.6',status:'ok',table:{...}});
-      // Son parantezi bul - greedy degil
-      var start = text.indexOf('({');
-      var end = text.lastIndexOf('});');
-      if (start === -1 || end === -1) throw new Error('GViz parse hatasi: ' + sheetName);
-      var jsonStr = text.slice(start + 1, end + 1);
+      // GViz yaniti ornek:
+      // /*O_o*/
+google.visualization.Query.setResponse({version:'0.6',status:'ok',table:{cols:[...],rows:[...]}});
+      // setResponse( den sonrasini al, son ); i cikar
+      var marker = 'setResponse(';
+      var start = text.indexOf(marker);
+      if (start === -1) throw new Error('GViz marker bulunamadi: ' + sheetName);
+      start = start + marker.length; // { buradan baslar
+      // Son karakter: yanit );  ile bitiyor, son 2 karakteri at
+      var jsonStr = text.slice(start).trim();
+      // Son ); karakterlerini at
+      if (jsonStr.endsWith(');')) jsonStr = jsonStr.slice(0, -2);
+      else if (jsonStr.endsWith(')')) jsonStr = jsonStr.slice(0, -1);
       var data = JSON.parse(jsonStr);
       callback(null, data);
     })
