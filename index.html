@@ -329,27 +329,25 @@ function growHtml(p) {
   return '<span class="'+(p>=0?'up':'down')+'">'+(p>=0?'▲':'▼')+' '+Math.abs(p).toFixed(1)+'%</span>';
 }
 
-// ── GOOGLE SHEETS FETCH
-// GViz API: tüm hücreleri JSON olarak döndürür
+// ── GOOGLE SHEETS FETCH (fetch API + ham JSON parse)
 function fetchSheet(sheetName, callback) {
   var url = 'https://docs.google.com/spreadsheets/d/' + SHEET_ID +
             '/gviz/tq?tqx=out:json&sheet=' + encodeURIComponent(sheetName);
-  var script = document.createElement('script');
-  var cbName = '_cb_' + Date.now() + '_' + Math.floor(Math.random()*10000);
-  window[cbName] = function(data) {
-    delete window[cbName];
-    document.head.removeChild(script);
-    callback(null, data);
-  };
-  script.onerror = function() {
-    delete window[cbName];
-    try { document.head.removeChild(script); } catch(e) {}
-    callback('Ağ hatası: ' + sheetName);
-  };
-  // GViz JSON callback format
-  url += '&tqx=out:json;responseHandler:' + cbName;
-  script.src = url;
-  document.head.appendChild(script);
+  fetch(url)
+    .then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.text();
+    })
+    .then(function(text) {
+      // GViz yaniti: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
+      var match = text.match(/google\.visualization\.Query\.setResponse\(([\s\S]*)\)/);
+      if (!match) throw new Error('GViz format hatasi: ' + sheetName);
+      var data = JSON.parse(match[1]);
+      callback(null, data);
+    })
+    .catch(function(err) {
+      callback(err.message || ('Hata: ' + sheetName));
+    });
 }
 
 // GViz response'u satır dizisine çevir (her satır obje: {sutunBasligi: deger})
@@ -396,11 +394,17 @@ function loadFromSheets() {
     remaining--;
     if (remaining > 0) return;
     if (Object.keys(loaded).length === 0) {
-      var msg = 'Hiçbir sayfa yüklenemedi.<br>Sheets bağlantısını ve paylaşım ayarlarını kontrol edin.<br><small>' + errors.join(', ') + '</small>';
+      var msg = 'Hiçbir sayfa yüklenemedi.<br>' +
+                'Sheets paylaşım ayarı: <b>"Bağlantıya sahip olan herkes → Görüntüleyici"</b> olmalı.<br>' +
+                '<small>Hatalar: ' + errors.join(' | ') + '</small>';
       document.getElementById('upload-err-msg').innerHTML = msg;
       document.getElementById('loading-screen').style.display = 'none';
       document.getElementById('upload-screen').style.display = 'flex';
       return;
+    }
+    // Kısmen yüklendi - yüklenemeyen sayfaları logla
+    if (errors.length > 0) {
+      console.warn('Yüklenemeyen sayfalar:', errors.join(', '));
     }
     try {
       processData(loaded);
