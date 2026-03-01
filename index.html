@@ -196,6 +196,7 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
     <button class="nav-btn" onclick="showPage('yillik',this)">📈 Yıllık Satışlar</button>
     <button class="nav-btn" onclick="showPage('hoca',this)">🎾 Tenis Hocası</button>
     <button class="nav-btn" onclick="showPage('urun',this)">📋 Ürün İstek</button>
+    <button class="nav-btn" onclick="showPage('sorumlular',this)">👤 Bölge Sorumluları</button>
     <button class="nav-btn" style="margin-left:auto;color:var(--accent)" onclick="loadFromSheets()">🔄 Yenile</button>
   </nav>
 
@@ -282,7 +283,29 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
         <div id="urun-ciro"></div>
       </div>
     </div>
+  </div>  <!-- PAGE 5 -->
+  <div id="page-sorumlular" class="page">
+    <div class="page-title">Tenis Bölge Sorumluları</div>
+    <div class="page-sub">Mağaza sorumluları, iletişim bilgileri ve sorumlu olunan mağazalar</div>
+    <div class="stats-row" id="sor-stats"></div>
+    <div class="tbl-wrap">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Mağaza</th>
+            <th>Ad Soyad</th>
+            <th>Telefon</th>
+            <th>Ünvan</th>
+            <th>2. Mağaza</th>
+            <th>3. Mağaza</th>
+          </tr>
+        </thead>
+        <tbody id="sor-tbody"></tbody>
+      </table>
+    </div>
   </div>
+
 </div>
 
 <script>
@@ -292,11 +315,12 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
 // ══════════════════════════════════════════════════
 var SHEET_ID = '11h3tZJH8StcrnTe85UcjyPirr2ViJ9E8nSZObOeQvlU';
 var SHEETS = {
-  hedef:  'Aylık Tenis Hedefleri',
-  yillik: 'Mağaza Yıllara Göre Satışlar',
-  alis:   'Tenis Hoca Alış',
-  yon:    'Tenis Hoca Yönlendirme',
-  urun:   'Mağaza Ürün İstek Sıralaması'
+  hedef:      'Aylık Tenis Hedefleri',
+  yillik:     'Mağaza Yıllara Göre Satışlar',
+  alis:       'Tenis Hoca Alış',
+  yon:        'Tenis Hoca Yönlendirme',
+  urun:       'Mağaza Ürün İstek Sıralaması',
+  sorumlular: 'Tenis Bölge Sorumluları'
 };
 
 // ── STATE
@@ -443,10 +467,11 @@ function loadFromSheets() {
 
 // ── VERİLERİ İŞLE
 function processData(sheets) {
-  if (sheets.hedef)  buildHedefler(sheets.hedef);
-  if (sheets.yillik) buildYillik(sheets.yillik);
+  if (sheets.hedef)       buildHedefler(sheets.hedef);
+  if (sheets.yillik)      buildYillik(sheets.yillik);
   if (sheets.alis || sheets.yon) buildHocaData(sheets.alis, sheets.yon);
-  if (sheets.urun)   buildUrun(sheets.urun);
+  if (sheets.urun)        buildUrun(sheets.urun);
+  if (sheets.sorumlular)  buildSorumlular(sheets.sorumlular);
 }
 
 // ════════════════════════════════════
@@ -723,6 +748,82 @@ function buildUrun(gvizData) {
         '<div style="display:flex;align-items:center;gap:6px">'+dh+' <span class="tag">Sistem: '+r.sira+'</span></div></div>';
   }
   document.getElementById('urun-ciro').innerHTML=ch;
+}
+
+// ════════════════════════════════════
+// PAGE 5: BÖLGE SORUMLULARI
+// Sütunlar: Mağaza | Ad-Soyad | Telefon | Mağaza Ünvanı | Sorumlu Olduğu 2. Mağaza | Sorumlu Olduğu 3. Mağaza
+// ════════════════════════════════════
+function buildSorumlular(gvizData) {
+  var rows = gvizToRows(gvizData);
+  if (!rows || rows.length === 0) {
+    document.getElementById('sor-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text2)">Veri bulunamadı</td></tr>';
+    return;
+  }
+
+  var unvanlar = {};
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var unvan = (r['Mağaza Ünvanı'] || r['Magaza Unvani'] || r[3] || '').toString().trim();
+    if (unvan) unvanlar[unvan] = (unvanlar[unvan] || 0) + 1;
+  }
+
+  // Stats
+  var magazaSayisi = rows.length;
+  var unvanCesidi = Object.keys(unvanlar).length;
+  var telefonlu = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var tel = (rows[i]['Telefon'] || rows[i][2] || '').toString().trim();
+    if (tel) telefonlu++;
+  }
+
+  document.getElementById('sor-stats').innerHTML =
+    sc(magazaSayisi, 'Toplam Kayıt') +
+    sc(unvanCesidi, 'Farklı Ünvan') +
+    sc(telefonlu, 'Telefon Kayıtlı');
+
+  var html = '';
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var magaza  = (r['Mağaza']   || r['Magaza']   || r[0] || '').toString().trim();
+    var adSoyad = (r['Ad-Soyad'] || r['Ad Soyad'] || r[1] || '').toString().trim();
+    var tel     = (r['Telefon']  || r[2] || '').toString().trim();
+    var unvan   = (r['Mağaza Ünvanı'] || r['Magaza Unvani'] || r[3] || '').toString().trim();
+    var mag2    = (r['Sorumlu Olduğu 2. Mağaza'] || r['Sorumlu Oldugu 2. Magaza'] || r[4] || '').toString().trim();
+    var mag3    = (r['Sorumlu Olduğu 3. Mağaza'] || r['Sorumlu Oldugu 3. Magaza'] || r[5] || '').toString().trim();
+
+    // Telefon: aramak için tel: linki, numarayı temizle
+    var telHtml = '—';
+    if (tel) {
+      var telClean = tel.replace(/\s+/g, '');
+      telHtml = '<a href="tel:' + telClean + '" style="color:var(--blue);text-decoration:none;font-family:\'IBM Plex Mono\',monospace;font-size:13px;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border:1px solid var(--border);border-radius:6px;transition:all .2s" onmouseover="this.style.borderColor=\'var(--blue)\';this.style.background=\'rgba(59,130,246,.1)\'" onmouseout="this.style.borderColor=\'var(--border)\';this.style.background=\'transparent\'">' +
+               '<span>📞</span>' + tel + '</a>';
+    }
+
+    // Ünvan için renk belirleme
+    var unvanClr = 'var(--text2)';
+    var ul = unvan.toLowerCase();
+    if (ul.indexOf('müdür') !== -1 || ul.indexOf('mudur') !== -1) unvanClr = 'var(--accent)';
+    else if (ul.indexOf('ikinci') !== -1 || ul.indexOf('yardımcı') !== -1) unvanClr = 'var(--orange)';
+    else if (ul.indexOf('sorumlu') !== -1) unvanClr = 'var(--blue)';
+
+    // Ek mağazalar için badge
+    function magBadge(m) {
+      if (!m) return '<span style="color:var(--text2)">—</span>';
+      return '<span style="display:inline-block;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:3px 10px;font-size:12px;font-weight:600">' + m + '</span>';
+    }
+
+    html += '<tr>' +
+      '<td class="num">' + (i + 1) + '</td>' +
+      '<td style="font-weight:700">' + (magaza || '—') + '</td>' +
+      '<td style="font-weight:600">' + (adSoyad || '—') + '</td>' +
+      '<td>' + telHtml + '</td>' +
+      '<td><span style="color:' + unvanClr + ';font-weight:600;font-size:13px">' + (unvan || '—') + '</span></td>' +
+      '<td>' + magBadge(mag2) + '</td>' +
+      '<td>' + magBadge(mag3) + '</td>' +
+      '</tr>';
+  }
+  document.getElementById('sor-tbody').innerHTML = html;
 }
 
 // ── STAT CARD HELPER
