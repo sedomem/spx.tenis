@@ -197,6 +197,7 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
     <button class="nav-btn" onclick="showPage('hoca',this)">🎾 Tenis Hocası</button>
     <button class="nav-btn" onclick="showPage('urun',this)">📋 Ürün İstek</button>
     <button class="nav-btn" onclick="showPage('sorumlular',this)">👤 Bölge Sorumluları</button>
+    <button class="nav-btn" onclick="showPage('aylikhedef',this)">🏆 Aylık Hedef Tutma</button>
     <button class="nav-btn" style="margin-left:auto;color:var(--accent)" onclick="loadFromSheets()">🔄 Yenile</button>
   </nav>
 
@@ -308,6 +309,43 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
       </table>
     </div>
   </div>
+  <!-- PAGE 6: AYLIK HEDEF TUTMA -->
+  <div id="page-aylikhedef" class="page">
+    <div class="page-title">Aylık Hedef Tutma Analizi</div>
+    <div class="page-sub">Mağaza bazlı aylık hedef gerçekleşme oranları · Ciro ve hedef tutma puanlaması</div>
+
+    <!-- Genel İstatistikler -->
+    <div class="stats-row" id="ah-stats"></div>
+
+    <!-- Rating Açıklaması -->
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:20px;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+      <span style="font-size:12px;font-weight:700;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-right:4px">Puanlama:</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:#FFD700">⭐⭐⭐ %100+ Hedef Aşıldı <span style="background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.35);border-radius:5px;padding:1px 8px;font-size:11px">3 puan</span></span>
+      <span style="color:var(--border)">|</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--green)">⭐⭐ %90–99 Hedefe Yakın <span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:5px;padding:1px 8px;font-size:11px">2 puan</span></span>
+      <span style="color:var(--border)">|</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--yellow)">⭐ %80–89 Kritik Eşik <span style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:5px;padding:1px 8px;font-size:11px">1 puan</span></span>
+      <span style="color:var(--border)">|</span>
+      <span style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--text2)">✗ %80 Altı <span style="background:var(--surface2);border:1px solid var(--border);border-radius:5px;padding:1px 8px;font-size:11px">0 puan</span></span>
+    </div>
+
+    <!-- Ay Bazlı Özet Kartları -->
+    <div class="card">
+      <div class="card-title">Aylık Mağaza Dağılımı</div>
+      <div id="ah-monthly-summary" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+    </div>
+
+    <!-- Ana Tablo -->
+    <div class="card">
+      <div class="card-title">Mağaza Detay Tablosu</div>
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border);">
+        <table class="tbl" id="ah-main-table" style="min-width:600px">
+          <thead id="ah-thead"></thead>
+          <tbody id="ah-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 
 </div>
 
@@ -323,7 +361,8 @@ var SHEETS = {
   alis:       'Tenis Hoca Alış',
   yon:        'Tenis Hoca Yönlendirme',
   urun:       'Mağaza Ürün İstek Sıralaması',
-  sorumlular: 'Tenis Bölge Sorumluları'
+  sorumlular: 'Tenis Bölge Sorumluları',
+  aylikhedef: 'Aylık Hedef Tutma'
 };
 
 // ── STATE
@@ -475,6 +514,7 @@ function processData(sheets) {
   if (sheets.alis || sheets.yon) buildHocaData(sheets.alis, sheets.yon);
   if (sheets.urun)        buildUrun(sheets.urun);
   if (sheets.sorumlular)  buildSorumlular(sheets.sorumlular);
+  if (sheets.aylikhedef)  buildAylikHedef(sheets.aylikhedef);
 }
 
 // ════════════════════════════════════
@@ -828,6 +868,233 @@ function buildSorumlular(gvizData) {
       '</tr>';
   }
   document.getElementById('sor-tbody').innerHTML = html;
+}
+
+// ════════════════════════════════════
+// PAGE 6: AYLIK HEDEF TUTMA
+// Yapı: Mağaza | OCAK(Ciro,Oran%) | ŞUBAT(Ciro,Oran%) | ... x12 ay
+// Sütun index: 0=Mağaza, 1=OcakCiro, 2=OcakOran, 3=ŞubatCiro, 4=ŞubatOran ...
+// ════════════════════════════════════
+function buildAylikHedef(gvizData) {
+  var AYLAR      = ['OCAK','ŞUBAT','MART','NİSAN','MAYIS','HAZİRAN','TEMMUZ','AĞUSTOS','EYLÜL','EKİM','KASIM','ARALIK'];
+  var AYLAR_KISA = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+  var rows = gvizToRows(gvizData);
+  if (!rows || rows.length === 0) {
+    document.getElementById('ah-tbody').innerHTML = '<tr><td colspan="20" style="text-align:center;color:var(--text2)">Veri bulunamadı</td></tr>';
+    return;
+  }
+
+  function getNum(v) {
+    if (v === null || v === undefined || v === '') return null;
+    var n = parseFloat(('' + v).replace(',', '.').replace('%', '').trim());
+    return isNaN(n) ? null : n;
+  }
+
+  function getPuan(oran) {
+    if (oran === null) return -1;
+    if (oran >= 100) return 3;
+    if (oran >= 90)  return 2;
+    if (oran >= 80)  return 1;
+    return 0;
+  }
+
+  function getRatingHtml(oran) {
+    if (oran === null) return '<span style="color:var(--text2);font-size:11px">—</span>';
+    var p = getPuan(oran);
+    var oranStr = Math.round(oran) + '%';
+    if (p === 3) return '<div style="text-align:center"><div style="font-size:13px;color:#FFD700;font-weight:800;font-family:\'IBM Plex Mono\',monospace">'+oranStr+'</div><div style="font-size:10px;color:#FFD700">⭐⭐⭐</div></div>';
+    if (p === 2) return '<div style="text-align:center"><div style="font-size:13px;color:var(--green);font-weight:800;font-family:\'IBM Plex Mono\',monospace">'+oranStr+'</div><div style="font-size:10px;color:var(--green)">⭐⭐</div></div>';
+    if (p === 1) return '<div style="text-align:center"><div style="font-size:13px;color:var(--yellow);font-weight:800;font-family:\'IBM Plex Mono\',monospace">'+oranStr+'</div><div style="font-size:10px;color:var(--yellow)">⭐</div></div>';
+    return '<div style="text-align:center"><div style="font-size:13px;color:var(--red);font-weight:800;font-family:\'IBM Plex Mono\',monospace">'+oranStr+'</div><div style="font-size:10px;color:var(--text2)">✗</div></div>';
+  }
+
+  function getCellBg(oran) {
+    if (oran === null) return '';
+    if (oran >= 100) return 'background:rgba(255,215,0,.07);';
+    if (oran >= 90)  return 'background:rgba(34,197,94,.07);';
+    if (oran >= 80)  return 'background:rgba(245,158,11,.07);';
+    return 'background:rgba(232,40,43,.07);';
+  }
+
+  // Hangi ayların verisi var
+  var ayliVerisi = [];
+  for (var a = 0; a < 12; a++) {
+    var hasData = false;
+    for (var ri = 0; ri < rows.length; ri++) {
+      var oranRaw = rows[ri][2 + a * 2];
+      if (getNum(oranRaw) !== null) { hasData = true; break; }
+    }
+    ayliVerisi.push(hasData);
+  }
+  var aktifAylar = [];
+  for (var a = 0; a < 12; a++) { if (ayliVerisi[a]) aktifAylar.push(a); }
+
+  // Mağaza verilerini işle
+  var magazalar = [];
+  for (var ri = 0; ri < rows.length; ri++) {
+    var r = rows[ri];
+    var magAd = (r['Mağaza'] || r['Magaza'] || r[0] || '').toString().trim();
+    if (!magAd || magAd.toLowerCase() === 'mağaza' || magAd.toLowerCase() === 'magaza') continue;
+
+    var ayData = [];
+    var toplamPuan = 0, maxPuan = 0;
+    var gun3 = 0, gun2 = 0, gun1 = 0, gun0 = 0, veriAy = 0;
+
+    for (var a = 0; a < 12; a++) {
+      var ciro = getNum(r[1 + a * 2]);
+      var oran = getNum(r[2 + a * 2]);
+      if (oran !== null && oran > 0 && oran <= 2) oran = oran * 100; // decimal → yüzde
+      ayData.push({ ciro: ciro, oran: oran });
+      if (oran !== null) {
+        veriAy++;
+        var p = getPuan(oran);
+        if (p >= 0) { toplamPuan += p; maxPuan += 3; }
+        if (p === 3) gun3++;
+        else if (p === 2) gun2++;
+        else if (p === 1) gun1++;
+        else if (p === 0) gun0++;
+      }
+    }
+    magazalar.push({
+      ad: magAd, ayData: ayData,
+      toplamPuan: toplamPuan, maxPuan: maxPuan,
+      veriAy: veriAy, gun3: gun3, gun2: gun2, gun1: gun1, gun0: gun0
+    });
+  }
+
+  magazalar.sort(function(a,b){ return b.toplamPuan - a.toplamPuan; });
+
+  // ── GENEL İSTATİSTİKLER
+  var topToplam = 0, topMax = 0, topGun3 = 0, topBasarili = 0;
+  for (var i = 0; i < magazalar.length; i++) {
+    topToplam  += magazalar[i].toplamPuan;
+    topMax     += magazalar[i].maxPuan;
+    topGun3    += magazalar[i].gun3;
+    topBasarili += (magazalar[i].gun3 + magazalar[i].gun2);
+  }
+  var ortPuan = magazalar.length ? (topToplam / magazalar.length).toFixed(1) : 0;
+  var enIyi   = magazalar[0] ? magazalar[0].ad : '—';
+
+  document.getElementById('ah-stats').innerHTML =
+    sc(magazalar.length,   'Mağaza Sayısı') +
+    sc(aktifAylar.length,  'Veri Olan Ay') +
+    sc(ortPuan + ' / 3',   'Ortalama Puan') +
+    sc(topGun3,            '⭐⭐⭐ Toplam Ay') +
+    sc(topBasarili,        '≥%90 Başarılı Ay') +
+    sc(enIyi,              '🏆 En İyi Mağaza');
+
+  // ── AYLIK ÖZET KARTLAR (kaç mağaza hedef tuttu o ay)
+  var monthlySumHtml = '';
+  for (var ai = 0; ai < aktifAylar.length; ai++) {
+    var a = aktifAylar[ai];
+    var m100=0, m90=0, m80=0, mDus=0;
+    for (var i = 0; i < magazalar.length; i++) {
+      var oran = magazalar[i].ayData[a].oran;
+      if (oran === null) continue;
+      var p = getPuan(oran);
+      if (p === 3) m100++;
+      else if (p === 2) m90++;
+      else if (p === 1) m80++;
+      else mDus++;
+    }
+    var topAy = m100 + m90 + m80 + mDus;
+    var basariPct = topAy > 0 ? Math.round((m100+m90+m80)/topAy*100) : 0;
+    var barClr = basariPct >= 80 ? '#FFD700' : basariPct >= 60 ? 'var(--green)' : 'var(--yellow)';
+    monthlySumHtml +=
+      '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;min-width:115px;flex:1">' +
+        '<div style="font-family:\'Bebas Neue\',sans-serif;font-size:15px;letter-spacing:2px;color:var(--accent);margin-bottom:8px">' + AYLAR[a] + '</div>' +
+        '<div style="font-size:12px;font-weight:600;display:flex;flex-direction:column;gap:3px">' +
+          '<span style="color:#FFD700">⭐⭐⭐ ' + m100 + ' mağaza</span>' +
+          '<span style="color:var(--green)">⭐⭐ ' + m90 + ' mağaza</span>' +
+          '<span style="color:var(--yellow)">⭐ ' + m80 + ' mağaza</span>' +
+          (mDus > 0 ? '<span style="color:var(--red)">✗ ' + mDus + ' mağaza</span>' : '') +
+          '<div style="margin-top:6px;height:4px;background:var(--surface);border-radius:4px"><div style="height:4px;border-radius:4px;background:'+barClr+';width:'+basariPct+'%"></div></div>' +
+          '<div style="font-size:10px;color:var(--text2);margin-top:2px">'+basariPct+'% başarı · ' + topAy + ' kayıt</div>' +
+        '</div>' +
+      '</div>';
+  }
+  document.getElementById('ah-monthly-summary').innerHTML = monthlySumHtml;
+
+  // ── TABLO BAŞLIĞI
+  var theadHtml = '<tr>' +
+    '<th style="position:sticky;left:0;background:var(--surface2);z-index:2;min-width:150px"># Mağaza</th>';
+  for (var ai = 0; ai < aktifAylar.length; ai++) {
+    theadHtml += '<th style="text-align:center;min-width:80px">' + AYLAR_KISA[aktifAylar[ai]] + '</th>';
+  }
+  theadHtml +=
+    '<th style="text-align:center;min-width:80px;color:#FFD700">Puan</th>' +
+    '<th style="text-align:center;min-width:110px">Yıllık<br>Hedefler</th>' +
+    '<th style="text-align:center;min-width:80px">Rating</th>' +
+    '</tr>';
+
+  // Ay bazlı kaç mağaza hedef tuttu — özet satırı
+  theadHtml += '<tr style="background:rgba(232,40,43,.05)">' +
+    '<td style="position:sticky;left:0;background:var(--surface2);z-index:2;font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1px;padding:6px 14px">HEDEF YAPAN MAĞAZA ↓</td>';
+  for (var ai = 0; ai < aktifAylar.length; ai++) {
+    var a = aktifAylar[ai];
+    var cnt80 = 0;
+    for (var i = 0; i < magazalar.length; i++) {
+      var oran = magazalar[i].ayData[a].oran;
+      if (oran !== null && oran >= 80) cnt80++;
+    }
+    var total80 = 0;
+    for (var i = 0; i < magazalar.length; i++) {
+      if (magazalar[i].ayData[a].oran !== null) total80++;
+    }
+    theadHtml += '<td style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-size:12px;font-weight:700;color:var(--green);padding:6px 4px">' +
+      cnt80 + '<span style="color:var(--text2);font-weight:400">/' + total80 + '</span></td>';
+  }
+  theadHtml += '<td colspan="3" style="text-align:center;font-size:11px;color:var(--text2);padding:6px">≥%80 hedef tutan</td></tr>';
+  document.getElementById('ah-thead').innerHTML = theadHtml;
+
+  // ── ANA MAĞAZA TABLOSU
+  var tbodyHtml = '';
+  for (var i = 0; i < magazalar.length; i++) {
+    var m = magazalar[i];
+    var puanPct = m.maxPuan > 0 ? Math.round(m.toplamPuan / m.maxPuan * 100) : 0;
+    var puanClr = puanPct >= 80 ? '#FFD700' : puanPct >= 60 ? 'var(--green)' : puanPct >= 40 ? 'var(--yellow)' : 'var(--red)';
+
+    // Rating (yıllık)
+    var yillikBasari = m.veriAy > 0 ? Math.round((m.gun3+m.gun2+m.gun1)/m.veriAy*100) : 0;
+    var ratingStr = '';
+    if (puanPct >= 85)      ratingStr = '<span style="font-size:16px">⭐⭐⭐</span><div style="font-size:10px;color:#FFD700;font-weight:700">MÜKEMMEL</div>';
+    else if (puanPct >= 65) ratingStr = '<span style="font-size:16px">⭐⭐</span><div style="font-size:10px;color:var(--green);font-weight:700">İYİ</div>';
+    else if (puanPct >= 45) ratingStr = '<span style="font-size:14px">⭐</span><div style="font-size:10px;color:var(--yellow);font-weight:700">ORTA</div>';
+    else                     ratingStr = '<span style="font-size:14px">✗</span><div style="font-size:10px;color:var(--text2);font-weight:700">GELİŞTİR</div>';
+
+    tbodyHtml += '<tr>';
+    tbodyHtml += '<td style="position:sticky;left:0;background:var(--surface);z-index:1;font-weight:700;white-space:nowrap">' +
+      '<span style="color:var(--accent);font-family:\'IBM Plex Mono\',monospace;font-size:12px;margin-right:8px">' + (i+1) + '</span>' + m.ad + '</td>';
+
+    for (var ai = 0; ai < aktifAylar.length; ai++) {
+      var a = aktifAylar[ai];
+      var oran = m.ayData[a].oran;
+      tbodyHtml += '<td style="text-align:center;padding:5px 4px;' + getCellBg(oran) + '">' + getRatingHtml(oran) + '</td>';
+    }
+
+    // Puan
+    tbodyHtml += '<td style="text-align:center;padding:8px 6px">' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:16px;font-weight:800;color:' + puanClr + '">' + m.toplamPuan + '</div>' +
+      '<div style="font-size:10px;color:var(--text2);margin-bottom:4px">/ ' + m.maxPuan + ' (' + puanPct + '%)</div>' +
+      '<div style="height:4px;background:var(--surface2);border-radius:4px"><div style="height:4px;border-radius:4px;background:' + puanClr + ';width:' + puanPct + '%"></div></div>' +
+    '</td>';
+
+    // Yıllık hedef tutma özeti
+    tbodyHtml += '<td style="text-align:center;padding:6px;font-size:11px;line-height:1.7">' +
+      (m.gun3 ? '<div style="color:#FFD700;font-weight:700">⭐⭐⭐ × ' + m.gun3 + ' ay</div>' : '') +
+      (m.gun2 ? '<div style="color:var(--green);font-weight:700">⭐⭐ × ' + m.gun2 + ' ay</div>' : '') +
+      (m.gun1 ? '<div style="color:var(--yellow);font-weight:700">⭐ × ' + m.gun1 + ' ay</div>' : '') +
+      (m.gun0 ? '<div style="color:var(--red);font-weight:700">✗ × ' + m.gun0 + ' ay</div>' : '') +
+      '<div style="margin-top:4px;padding-top:4px;border-top:1px solid var(--border);font-size:10px;color:var(--text2)">' +
+        (m.gun3+m.gun2+m.gun1) + '/' + m.veriAy + ' ay ≥%80' +
+      '</div>' +
+    '</td>';
+
+    // Rating
+    tbodyHtml += '<td style="text-align:center;padding:6px">' + ratingStr + '</td>';
+    tbodyHtml += '</tr>';
+  }
+  document.getElementById('ah-tbody').innerHTML = tbodyHtml;
 }
 
 // ── STAT CARD HELPER
