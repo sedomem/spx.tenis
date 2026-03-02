@@ -161,8 +161,49 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
 ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
 ::-webkit-scrollbar-thumb:hover { background:var(--accent); }
 
-@media(max-width:768px) { .dual-grid{grid-template-columns:1fr;} .hoca-grid{grid-template-columns:1fr;}
-</style>
+/* MAĞAZA POPUP MODAL */
+.mag-modal-overlay {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.65);
+  z-index:999; backdrop-filter:blur(4px); align-items:center; justify-content:center;
+}
+.mag-modal-overlay.open { display:flex; }
+.mag-modal {
+  background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  width:min(820px,96vw); max-height:90vh; overflow-y:auto;
+  box-shadow:0 24px 60px rgba(0,0,0,.6); position:relative;
+  animation:modalIn .22s cubic-bezier(.34,1.3,.64,1);
+}
+@keyframes modalIn { from{opacity:0;transform:scale(.92) translateY(16px)} to{opacity:1;transform:none} }
+.mag-modal-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:20px 24px 16px; border-bottom:2px solid var(--accent);
+  position:sticky; top:0; background:var(--surface); z-index:2;
+}
+.mag-modal-title { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:3px; }
+.mag-modal-close {
+  background:var(--surface2); border:1px solid var(--border); color:var(--text);
+  width:36px; height:36px; border-radius:8px; font-size:18px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:all .2s;
+  flex-shrink:0;
+}
+.mag-modal-close:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+.mag-modal-body { padding:20px 24px 24px; }
+.mag-month-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; margin-bottom:20px; }
+.mag-month-card {
+  border:1px solid var(--border); border-radius:10px; padding:12px 14px;
+  background:var(--surface2); transition:transform .15s;
+}
+.mag-month-card:hover { transform:translateY(-2px); }
+.mag-month-card.c100 { border-color:rgba(255,215,0,.4); background:rgba(255,215,0,.06); }
+.mag-month-card.c90  { border-color:rgba(34,197,94,.4);  background:rgba(34,197,94,.06); }
+.mag-month-card.c80  { border-color:rgba(245,158,11,.4); background:rgba(245,158,11,.06); }
+.mag-month-card.clow { border-color:rgba(232,40,43,.3);  background:rgba(232,40,43,.05); }
+.mag-month-name { font-family:'Bebas Neue',sans-serif; font-size:13px; letter-spacing:2px; color:var(--text2); margin-bottom:6px; }
+.mag-month-ciro { font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:700; margin-bottom:4px; }
+.mag-month-oran { font-size:20px; font-weight:800; font-family:'IBM Plex Mono',monospace; }
+.mag-month-stars { font-size:13px; margin-top:2px; }
+
+@media(max-width:768px) { .dual-grid{grid-template-columns:1fr;} .hoca-grid{grid-template-columns:1fr;} .mag-month-grid{grid-template-columns:repeat(3,1fr);} }
 </head>
 <body>
 
@@ -346,10 +387,27 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
       </div>
     </div>
   </div>
-
+<!-- MAĞAZA DETAY MODAL -->
+<div class="mag-modal-overlay" id="mag-modal-overlay" onclick="closeMagModal(event)">
+  <div class="mag-modal" id="mag-modal">
+    <div class="mag-modal-header">
+      <div>
+        <div class="mag-modal-title" id="mag-modal-name">—</div>
+        <div style="font-size:12px;color:var(--text2);letter-spacing:1px;margin-top:2px" id="mag-modal-sub"></div>
+      </div>
+      <button class="mag-modal-close" onclick="closeMagModal(null)" title="Kapat">✕</button>
+    </div>
+    <div class="mag-modal-body">
+      <div class="stats-row" id="mag-modal-stats" style="margin-bottom:20px"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">AYLIK CİRO & PERFORMANS</div>
+      <div class="mag-month-grid" id="mag-modal-grid"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">YILLIK ÖZET</div>
+      <div id="mag-modal-yearly"></div>
+    </div>
+  </div>
 </div>
 
-<script>
+</div>
 // ══════════════════════════════════════════════════
 // GOOGLE SHEETS ENTEGRASYONU
 // Sayfa adları: Türkçe karakterlere dikkat!
@@ -1063,8 +1121,18 @@ function buildAylikHedef(gvizData) {
     else                     ratingStr = '<span style="font-size:14px">✗</span><div style="font-size:10px;color:var(--text2);font-weight:700">GELİŞTİR</div>';
 
     tbodyHtml += '<tr>';
-    tbodyHtml += '<td style="position:sticky;left:0;background:var(--surface);z-index:1;font-weight:700;white-space:nowrap">' +
-      '<span style="color:var(--accent);font-family:\'IBM Plex Mono\',monospace;font-size:12px;margin-right:8px">' + (i+1) + '</span>' + m.ad + '</td>';
+    // Mağaza adı — tıklanabilir popup açar
+    tbodyHtml += '<td style="position:sticky;left:0;background:var(--surface);z-index:1;white-space:nowrap">' +
+      '<button onclick="openMagModal(' + i + ')" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 0;width:100%;text-align:left">' +
+        '<span style="color:var(--accent);font-family:\'IBM Plex Mono\',monospace;font-size:12px">' + (i+1) + '</span>' +
+        '<span style="font-weight:700;color:var(--text);font-family:\'Rajdhani\',sans-serif;font-size:14px;border-bottom:1px dashed var(--border);padding-bottom:1px;transition:color .15s" ' +
+          'onmouseover="this.style.color=\'var(--accent)\';this.style.borderBottomColor=\'var(--accent)\'" ' +
+          'onmouseout="this.style.color=\'var(--text)\';this.style.borderBottomColor=\'var(--border)\'">' +
+          m.ad +
+        '</span>' +
+        '<span style="font-size:10px;color:var(--text2)">↗</span>' +
+      '</button>' +
+    '</td>';
 
     for (var ai = 0; ai < aktifAylar.length; ai++) {
       var a = aktifAylar[ai];
@@ -1095,9 +1163,127 @@ function buildAylikHedef(gvizData) {
     tbodyHtml += '</tr>';
   }
   document.getElementById('ah-tbody').innerHTML = tbodyHtml;
+
+  // APP'e sakla — popup için
+  APP._ahMagazalar   = magazalar;
+  APP._ahAktifAylar  = aktifAylar;
+  APP._ahAYLAR       = AYLAR;
+  APP._ahAYLAR_KISA  = AYLAR_KISA;
 }
 
-// ── STAT CARD HELPER
+// ── MAĞAZA POPUP
+function openMagModal(idx) {
+  var magazalar  = APP._ahMagazalar;
+  var aktifAylar = APP._ahAktifAylar;
+  var AYLAR      = APP._ahAYLAR;
+  if (!magazalar || !magazalar[idx]) return;
+  var m = magazalar[idx];
+
+  var AYLAR_KISA = APP._ahAYLAR_KISA;
+
+  function getPuan(oran) {
+    if (oran === null) return -1;
+    if (oran >= 100) return 3;
+    if (oran >= 90)  return 2;
+    if (oran >= 80)  return 1;
+    return 0;
+  }
+
+  // Header
+  var puanPct = m.maxPuan > 0 ? Math.round(m.toplamPuan / m.maxPuan * 100) : 0;
+  var puanClr = puanPct >= 80 ? '#FFD700' : puanPct >= 60 ? 'var(--green)' : puanPct >= 40 ? 'var(--yellow)' : 'var(--red)';
+  document.getElementById('mag-modal-name').textContent = m.ad;
+  document.getElementById('mag-modal-sub').textContent  = 'Sıra: #' + (idx+1) + '  ·  Puan: ' + m.toplamPuan + '/' + m.maxPuan + '  ·  ' + m.veriAy + ' ay veri';
+
+  // Stats
+  var topCiro = 0;
+  for (var a = 0; a < 12; a++) { if (m.ayData[a].ciro) topCiro += m.ayData[a].ciro; }
+  var enYuksekAy = null, enYuksekCiro = 0;
+  for (var ai = 0; ai < aktifAylar.length; ai++) {
+    var a = aktifAylar[ai];
+    if (m.ayData[a].ciro && m.ayData[a].ciro > enYuksekCiro) {
+      enYuksekCiro = m.ayData[a].ciro;
+      enYuksekAy   = AYLAR[a];
+    }
+  }
+  var ratingStr = puanPct >= 85 ? '⭐⭐⭐ MÜKEMMEL' : puanPct >= 65 ? '⭐⭐ İYİ' : puanPct >= 45 ? '⭐ ORTA' : '✗ GELİŞTİR';
+  document.getElementById('mag-modal-stats').innerHTML =
+    sc(new Intl.NumberFormat('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0}).format(topCiro)+' ₺', 'Toplam Ciro') +
+    sc(enYuksekAy || '—', 'En Yüksek Ay') +
+    sc(m.gun3 + ' ay', '⭐⭐⭐ Hedef Aşıldı') +
+    sc((m.gun3+m.gun2+m.gun1) + '/' + m.veriAy, '≥%80 Başarı') +
+    sc(ratingStr, 'Yıllık Rating');
+
+  // Aylık kartlar
+  var gridHtml = '';
+  for (var ai = 0; ai < aktifAylar.length; ai++) {
+    var a = aktifAylar[ai];
+    var oran = m.ayData[a].oran;
+    var ciro = m.ayData[a].ciro;
+    var p    = getPuan(oran);
+    var cls  = p === 3 ? 'c100' : p === 2 ? 'c90' : p === 1 ? 'c80' : (p === 0 ? 'clow' : '');
+    var clrOran  = p === 3 ? '#FFD700' : p === 2 ? 'var(--green)' : p === 1 ? 'var(--yellow)' : (p === 0 ? 'var(--red)' : 'var(--text2)');
+    var stars    = p === 3 ? '⭐⭐⭐' : p === 2 ? '⭐⭐' : p === 1 ? '⭐' : (p === 0 ? '✗' : '—');
+    var ciroStr  = ciro ? new Intl.NumberFormat('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0}).format(ciro)+' ₺' : '—';
+    var oranStr  = oran !== null ? Math.round(oran)+'%' : '—';
+
+    gridHtml +=
+      '<div class="mag-month-card ' + cls + '">' +
+        '<div class="mag-month-name">' + AYLAR[a] + '</div>' +
+        '<div class="mag-month-ciro" style="color:var(--text)">' + ciroStr + '</div>' +
+        '<div class="mag-month-oran" style="color:' + clrOran + '">' + oranStr + '</div>' +
+        '<div class="mag-month-stars" style="color:' + clrOran + '">' + stars + '</div>' +
+      '</div>';
+  }
+  document.getElementById('mag-modal-grid').innerHTML = gridHtml;
+
+  // Yıllık özet progress bars
+  var yearlyHtml =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    // Progress bar — puan yüzdesi
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
+      '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Genel Performans</div>' +
+      '<div style="display:flex;align-items:center;gap:12px">' +
+        '<div style="flex:1;background:var(--surface);border-radius:6px;height:10px">' +
+          '<div style="height:10px;border-radius:6px;background:linear-gradient(90deg,var(--accent),' + puanClr + ');width:' + puanPct + '%;transition:width .6s"></div>' +
+        '</div>' +
+        '<span style="font-family:\'IBM Plex Mono\',monospace;font-size:15px;font-weight:800;color:' + puanClr + '">' + puanPct + '%</span>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
+        (m.gun3 ? '<span style="background:rgba(255,215,0,.12);border:1px solid rgba(255,215,0,.3);border-radius:5px;padding:2px 10px;font-size:12px;font-weight:700;color:#FFD700">⭐⭐⭐ × ' + m.gun3 + '</span>' : '') +
+        (m.gun2 ? '<span style="background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:5px;padding:2px 10px;font-size:12px;font-weight:700;color:var(--green)">⭐⭐ × ' + m.gun2 + '</span>' : '') +
+        (m.gun1 ? '<span style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:5px;padding:2px 10px;font-size:12px;font-weight:700;color:var(--yellow)">⭐ × ' + m.gun1 + '</span>' : '') +
+        (m.gun0 ? '<span style="background:rgba(232,40,43,.08);border:1px solid rgba(232,40,43,.25);border-radius:5px;padding:2px 10px;font-size:12px;font-weight:700;color:var(--red)">✗ × ' + m.gun0 + '</span>' : '') +
+      '</div>' +
+    '</div>' +
+    // Ciro tablosu özeti
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
+      '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px">Ciro Özeti</div>' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:22px;font-weight:800;color:var(--text)">' +
+        new Intl.NumberFormat('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0}).format(topCiro) + ' ₺' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text2);margin-top:4px">' + m.veriAy + ' aylık toplam</div>' +
+      '<div style="margin-top:8px;font-size:12px;color:var(--text2)">En yüksek: <span style="color:var(--text);font-weight:700">' + (enYuksekAy||'—') + ' — ' +
+        new Intl.NumberFormat('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:0}).format(enYuksekCiro) + ' ₺</span>' +
+      '</div>' +
+    '</div>' +
+    '</div>';
+  document.getElementById('mag-modal-yearly').innerHTML = yearlyHtml;
+
+  document.getElementById('mag-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeMagModal(e) {
+  if (e && e.target !== document.getElementById('mag-modal-overlay')) return;
+  document.getElementById('mag-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ESC tuşu ile kapat
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeMagModal(null);
+});
 function sc(val,lbl){
   return '<div class="stat-card"><div class="stat-val">'+val+'</div><div class="stat-lbl">'+lbl+'</div></div>';
 }
