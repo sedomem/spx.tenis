@@ -703,56 +703,111 @@ function buildYillik(gvizData) {
 
 // ════════════════════════════════════
 // PAGE 3: HOCA
+// Birleştirme anahtarı: TENİS HOCASI sütunundaki müşteri numarası (kod)
+// Kod yoksa normalize edilmiş ad kullanılır
 // ════════════════════════════════════
 function buildHocaData(alisData, yonData) {
-  var alis={}, yon={};
+
+  // Bir GViz sayfasını parse et → target objesine birleştir
+  // key = müşteri kodu (öncelikli) veya normalize ad
   function parseHoca(gvizData, target) {
     if (!gvizData) return;
     var rows = gvizToRows(gvizData);
-    for (var i=0;i<rows.length;i++) {
-      var r=rows[i];
-      var ad = r['TENİS HOCASI Açıklama'] || r['TENIS HOCASI Aciklama'] || r['Açıklama'] || r['Aciklama'] || '';
-      var kod = r['TENİS HOCASI'] || r['TENIS HOCASI'] || r['Hoca Kodu'] || '';
-      if (!ad) continue;
-      var key = ad.toString().trim().toLowerCase();
-      if (!target[key]) target[key]={kod:kod,ad:ad,tutar:0,miktar:0};
-      target[key].tutar  += parseFloat(r['Satışlar (Ş)'] || r['Satislar'] || r['Satışlar'] || 0) || 0;
-      target[key].miktar += parseFloat(r['Satış Miktarı'] || r['Satis Miktari'] || 0) || 0;
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+
+      // Müşteri kodu — "TENİS HOCASI" sütunu
+      var kodRaw = r['TENİS HOCASI'] || r['TENIS HOCASI'] || r['Tenis Hocası'] || r['Tenis Hocasi'] || r[0] || '';
+      var kod = kodRaw.toString().trim();
+
+      // Açıklama / Ad — "TENİS HOCASI Açıklama" veya "Açıklama" sütunu
+      var adRaw = r['TENİS HOCASI Açıklama'] || r['TENIS HOCASI Aciklama'] || r['Açıklama'] || r['Aciklama'] || r['Ad Soyad'] || '';
+      var ad = adRaw.toString().trim();
+
+      // En az biri olmalı
+      if (!kod && !ad) continue;
+
+      // Birleştirme anahtarı: kod varsa kod, yoksa normalize ad
+      var key = kod ? kod.toLowerCase() : ad.toLowerCase().replace(/\s+/g, ' ');
+
+      // Tutar sütunları
+      var tutar = parseFloat(
+        r['Satışlar (Ş)'] || r['Satislar (S)'] || r['Satışlar'] || r['Satislar'] ||
+        r['Net Satışlar'] || r['Net Satislar'] || 0
+      ) || 0;
+      var miktar = parseFloat(
+        r['Satış Miktarı'] || r['Satis Miktari'] || r['Miktar'] || 0
+      ) || 0;
+
+      if (!target[key]) {
+        target[key] = { kod: kod, ad: ad, tutar: 0, miktar: 0 };
+      } else {
+        // Aynı key'e denk geldi — ad ve kodu güncelle (boşsa doldur)
+        if (!target[key].kod && kod) target[key].kod = kod;
+        if (!target[key].ad  && ad)  target[key].ad  = ad;
+      }
+      target[key].tutar  += tutar;
+      target[key].miktar += miktar;
     }
   }
-  parseHoca(alisData, alis);
-  parseHoca(yonData, yon);
 
-  var allKeys={};
-  Object.keys(alis).forEach(function(k){allKeys[k]=1;});
-  Object.keys(yon).forEach(function(k){allKeys[k]=1;});
-  var merged=[];
+  var alis = {}, yon = {};
+  parseHoca(alisData, alis);
+  parseHoca(yonData,  yon);
+
+  // Tüm benzersiz anahtarları topla
+  var allKeys = {};
+  Object.keys(alis).forEach(function(k){ allKeys[k] = 1; });
+  Object.keys(yon).forEach(function(k){  allKeys[k] = 1; });
+
+  var merged = [];
   Object.keys(allKeys).forEach(function(k) {
-    var a=alis[k]||{tutar:0,miktar:0,ad:k,kod:''};
-    var y=yon[k]||{tutar:0,miktar:0};
-    merged.push({key:k,name:a.ad||(yon[k]?yon[k].ad:k),kod:a.kod||(yon[k]?yon[k].kod:''),
-      aTutar:a.tutar,aMiktar:a.miktar,yTutar:y.tutar,yMiktar:y.miktar,toplam:a.tutar+y.tutar});
+    var a = alis[k] || { tutar:0, miktar:0, ad:'', kod:'' };
+    var y = yon[k]  || { tutar:0, miktar:0, ad:'', kod:'' };
+    // Ad: alış'tan al, yoksa yönlendirmeden
+    var displayAd  = a.ad  || y.ad  || k;
+    var displayKod = a.kod || y.kod || k;
+    merged.push({
+      key:     k,
+      name:    displayAd,
+      kod:     displayKod,
+      aTutar:  a.tutar,
+      aMiktar: a.miktar,
+      yTutar:  y.tutar,
+      yMiktar: y.miktar,
+      toplam:  a.tutar + y.tutar
+    });
   });
-  merged.sort(function(a,b){return b.toplam-a.toplam;});
-  var grandTotal=0;
-  for (var i=0;i<merged.length;i++) grandTotal+=merged[i].toplam;
-  for (var i=0;i<merged.length;i++) { merged[i].rank=i+1; merged[i].pct=grandTotal?(merged[i].toplam/grandTotal*100).toFixed(2):0; }
-  APP.hocalar=merged;
-  var top15=merged.slice(0,15);
-  var maxT=top15[0]?top15[0].toplam:1;
-  var html='';
-  for (var i=0;i<top15.length;i++) {
-    var h=top15[i], bw=(h.toplam/maxT*100).toFixed(1);
-    html+='<tr>'+
-      '<td class="num" style="color:var(--accent);font-weight:700">'+(i+1)+'</td>'+
-      '<td style="font-weight:700">'+(h.name||'—')+'</td>'+
-      '<td class="num" style="color:var(--blue)">'+fmtN(h.aTutar)+'</td>'+
-      '<td class="num" style="color:var(--orange)">'+fmtN(h.yTutar)+'</td>'+
-      '<td class="num" style="color:var(--green);font-weight:700">'+fmtN(h.toplam)+'</td>'+
-      '<td class="num">'+h.pct+'%</td>'+
-      '<td><div class="pct-wrap"><div class="pct-fill" style="width:'+bw+'%"></div></div></td></tr>';
+
+  merged.sort(function(a,b){ return b.toplam - a.toplam; });
+
+  var grandTotal = 0;
+  for (var i = 0; i < merged.length; i++) grandTotal += merged[i].toplam;
+  for (var i = 0; i < merged.length; i++) {
+    merged[i].rank = i + 1;
+    merged[i].pct  = grandTotal ? (merged[i].toplam / grandTotal * 100).toFixed(2) : 0;
   }
-  document.getElementById('hoca-top15').innerHTML=html;
+
+  APP.hocalar = merged;
+
+  // Top 15 tablo
+  var top15 = merged.slice(0, 15);
+  var maxT   = top15[0] ? top15[0].toplam : 1;
+  var html   = '';
+  for (var i = 0; i < top15.length; i++) {
+    var h = top15[i];
+    var bw = (h.toplam / maxT * 100).toFixed(1);
+    html += '<tr>' +
+      '<td class="num" style="color:var(--accent);font-weight:700">' + (i+1) + '</td>' +
+      '<td style="font-weight:700">' + (h.name || '—') + '</td>' +
+      '<td class="num" style="color:var(--blue)">'   + fmtN(h.aTutar) + '</td>' +
+      '<td class="num" style="color:var(--orange)">' + fmtN(h.yTutar) + '</td>' +
+      '<td class="num" style="color:var(--green);font-weight:700">' + fmtN(h.toplam) + '</td>' +
+      '<td class="num">' + h.pct + '%</td>' +
+      '<td><div class="pct-wrap"><div class="pct-fill" style="width:' + bw + '%"></div></div></td>' +
+      '</tr>';
+  }
+  document.getElementById('hoca-top15').innerHTML = html;
 }
 
 function hocaSearch(val) {
