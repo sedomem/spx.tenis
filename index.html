@@ -281,6 +281,12 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
   <div id="page-hoca" class="page">
     <div class="page-title">Tenis Hocası Arama</div>
     <div class="page-sub">Hoca adı veya müşteri kodu · Alış ve Yönlendirme birleşik</div>
+
+    <!-- GENEL ÖZET KARTLARI -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:24px" id="hoca-ozet">
+      <!-- JS ile doldurulur -->
+    </div>
+
     <div class="search-wrap">
       <span class="s-icon">🔍</span>
       <input class="search-input" id="hoca-input" type="text" placeholder="Hoca adı veya müşteri kodu girin…" autocomplete="off" oninput="hocaSearch(this.value)">
@@ -835,6 +841,44 @@ function buildHocaData(alisData, yonData) {
   }
 
   APP.hocalar = merged;
+
+  // ── GENEL ÖZET KARTLARI (arama çubuğunun üstü)
+  var topAlis = 0, topYon = 0;
+  for (var i = 0; i < merged.length; i++) {
+    topAlis += merged[i].aTutar;
+    topYon  += merged[i].yTutar;
+  }
+  var topToplam = topAlis + topYon;
+  var fark      = topAlis - topYon;
+  var farkClr   = fark >= 0 ? 'var(--blue)' : 'var(--orange)';
+  var farkLbl   = fark >= 0 ? 'Alış Fazlası' : 'Yönlendirme Fazlası';
+
+  // Alış / Yönlendirme yüzde payları
+  var alisPay = topToplam > 0 ? (topAlis / topToplam * 100).toFixed(1) : 0;
+  var yonPay  = topToplam > 0 ? (topYon  / topToplam * 100).toFixed(1) : 0;
+
+  function ozetKart(renk, ikon, baslik, tutar, alt, progress) {
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-left:4px solid ' + renk + ';border-radius:12px;padding:18px 20px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<span style="font-size:18px">' + ikon + '</span>' +
+        '<span style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase">' + baslik + '</span>' +
+      '</div>' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:22px;font-weight:800;color:' + renk + ';margin-bottom:4px">' + tutar + '</div>' +
+      '<div style="font-size:12px;color:var(--text2);margin-bottom:' + (progress ? '10px' : '0') + '">' + alt + '</div>' +
+      (progress
+        ? '<div style="background:var(--surface2);border-radius:4px;height:5px"><div style="height:5px;border-radius:4px;background:' + renk + ';width:' + progress + '%;transition:width .6s"></div></div>'
+        : '') +
+    '</div>';
+  }
+
+  var ozetEl = document.getElementById('hoca-ozet');
+  if (ozetEl) {
+    ozetEl.innerHTML =
+      ozetKart('var(--blue)',   '🛍️',  'Hoca Alış',         fmtN(topAlis),   merged.length + ' hoca · %' + alisPay + ' pay', alisPay) +
+      ozetKart('var(--orange)', '🎾',  'Hoca Yönlendirme',  fmtN(topYon),    merged.length + ' hoca · %' + yonPay + ' pay',  yonPay) +
+      ozetKart(farkClr,         '↔️',  farkLbl,             fmtN(Math.abs(fark)), 'Alış ile yönlendirme arasındaki fark', null) +
+      ozetKart('var(--green)',  '💰',  'Toplam Ciro',        fmtN(topToplam), 'Tüm hocaların birleşik toplamı', null);
+  }
 
   // Top 15 tablo
   var top15 = merged.slice(0, 15);
