@@ -240,6 +240,7 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
     <button class="nav-btn" onclick="showPage('urun',this)">📋 Ürün İstek</button>
     <button class="nav-btn" onclick="showPage('sorumlular',this)">👤 Bölge Sorumluları</button>
     <button class="nav-btn" onclick="showPage('aylikhedef',this)">🏆 Aylık Hedef Tutma</button>
+    <button class="nav-btn" onclick="showPage('kordaj',this)">🎸 Kordaj Çekimleri</button>
     <button class="nav-btn" style="margin-left:auto;color:var(--accent)" onclick="loadFromSheets()">🔄 Yenile</button>
   </nav>
 
@@ -388,6 +389,49 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
       </div>
     </div>
   </div>
+  <!-- PAGE 7: KORDAJ ÇEKİMLERİ -->
+  <div id="page-kordaj" class="page">
+    <div class="page-title">Kordaj Çekimleri</div>
+    <div class="page-sub">Mağaza bazlı kordaj çekim adetleri · 2025 ve 2026 karşılaştırması</div>
+    <div class="stats-row" id="kordaj-stats"></div>
+    <div class="tbl-wrap">
+      <table class="tbl" id="kordaj-table">
+        <thead>
+          <tr>
+            <th style="min-width:40px">#</th>
+            <th style="min-width:160px">Mağaza</th>
+            <th style="text-align:center;min-width:100px">2025</th>
+            <th style="text-align:center;min-width:100px">2026</th>
+            <th style="text-align:center;min-width:110px">Değişim %</th>
+            <th style="text-align:center;min-width:130px">Trend</th>
+            <th style="text-align:center;min-width:80px">Toplam</th>
+          </tr>
+        </thead>
+        <tbody id="kordaj-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- KORDAJ POPUP MODAL -->
+<div class="mag-modal-overlay" id="kordaj-modal-overlay" onclick="closeKordajModal(event)">
+  <div class="mag-modal" id="kordaj-modal">
+    <div class="mag-modal-header">
+      <div>
+        <div class="mag-modal-title" id="kordaj-modal-name">—</div>
+        <div style="font-size:12px;color:var(--text2);letter-spacing:1px;margin-top:2px" id="kordaj-modal-sub"></div>
+      </div>
+      <button class="mag-modal-close" onclick="closeKordajModal(null)" title="Kapat">✕</button>
+    </div>
+    <div class="mag-modal-body">
+      <div class="stats-row" id="kordaj-modal-stats" style="margin-bottom:20px"></div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px">YIL BAZLI ÇEKİM DETAYI</div>
+      <div id="kordaj-modal-body"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MAĞAZA DETAY MODAL -->
 <div class="mag-modal-overlay" id="mag-modal-overlay" onclick="closeMagModal(event)">
   <div class="mag-modal" id="mag-modal">
@@ -423,7 +467,8 @@ var SHEETS = {
   yon:        'Tenis Hoca Yönlendirme',
   urun:       'Mağaza Ürün İstek Sıralaması',
   sorumlular: 'Tenis Bölge Sorumluları',
-  aylikhedef: 'Aylık Hedef Tutma'
+  aylikhedef: 'Aylık Hedef Tutma',
+  kordaj:     'Kordaj Çekimleri'
 };
 
 // ── STATE
@@ -576,6 +621,7 @@ function processData(sheets) {
   if (sheets.urun)        buildUrun(sheets.urun);
   if (sheets.sorumlular)  buildSorumlular(sheets.sorumlular);
   if (sheets.aylikhedef)  buildAylikHedef(sheets.aylikhedef);
+  if (sheets.kordaj)      buildKordaj(sheets.kordaj);
 }
 
 // ════════════════════════════════════
@@ -1338,10 +1384,257 @@ function closeMagModal(e) {
   document.body.style.overflow = '';
 }
 
-// ESC tuşu ile kapat
+// ════════════════════════════════════
+// PAGE 7: KORDAJ ÇEKİMLERİ
+// Sheets yapısı: İki ayrı tablo yan yana
+//   Sol  (A:B) → 2025: Mağaza Adı | Satış Miktarı
+//   Sağ  (D:E) → 2026: Mağaza Adı | Satış Miktarı
+//   Son satır "Genel Toplam" — atla
+// ════════════════════════════════════
+function buildKordaj(gvizData) {
+  var arr = gvizToArr(gvizData);
+  if (!arr || arr.length === 0) {
+    document.getElementById('kordaj-tbody').innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:var(--text2)">Veri bulunamadı</td></tr>';
+    return;
+  }
+
+  // Parse sol tablo (2025: col 0,1) ve sağ tablo (2026: col 3,4)
+  var data2025 = {}, data2026 = {};
+
+  function getNum(v) {
+    if (v === null || v === undefined) return null;
+    var s = v.toString().replace(/\./g,'').replace(',','.').trim();
+    var n = parseFloat(s);
+    return isNaN(n) ? null : n;
+  }
+
+  for (var i = 0; i < arr.length; i++) {
+    var row = arr[i];
+    // Sol: 2025
+    var mag25 = row[0] ? row[0].toString().trim() : '';
+    var adet25 = getNum(row[1]);
+    if (mag25 && mag25 !== 'Mağaza Adı' && mag25 !== 'Magaza Adi' &&
+        mag25.toLowerCase().indexOf('toplam') === -1 && adet25 !== null) {
+      data2025[mag25.toUpperCase()] = (data2025[mag25.toUpperCase()] || 0) + adet25;
+    }
+    // Sağ: 2026
+    var mag26 = row[3] ? row[3].toString().trim() : '';
+    var adet26 = getNum(row[4]);
+    if (mag26 && mag26 !== 'Mağaza Adı' && mag26 !== 'Magaza Adi' &&
+        mag26.toLowerCase().indexOf('toplam') === -1 && adet26 !== null) {
+      data2026[mag26.toUpperCase()] = (data2026[mag26.toUpperCase()] || 0) + adet26;
+    }
+  }
+
+  // Birleştir
+  var allMags = {};
+  Object.keys(data2025).forEach(function(k){ allMags[k] = 1; });
+  Object.keys(data2026).forEach(function(k){ allMags[k] = 1; });
+
+  var liste = [];
+  Object.keys(allMags).forEach(function(k) {
+    var a25 = data2025[k] || 0;
+    var a26 = data2026[k] || 0;
+    var degisim = a25 > 0 ? ((a26 - a25) / a25 * 100) : null;
+    liste.push({ magaza: k, adet25: a25, adet26: a26, degisim: degisim, toplam: a25 + a26 });
+  });
+
+  // En çok toplam çekimden en aza sırala
+  liste.sort(function(a, b) { return b.toplam - a.toplam; });
+
+  // Sıra numarası ekle
+  for (var i = 0; i < liste.length; i++) liste[i].sira = i + 1;
+
+  // APP'e kaydet (popup için)
+  APP._kordajListe = liste;
+
+  // Stats
+  var top25 = 0, top26 = 0, artanMag = 0, azalanMag = 0;
+  for (var i = 0; i < liste.length; i++) {
+    top25 += liste[i].adet25;
+    top26 += liste[i].adet26;
+    if (liste[i].degisim !== null && liste[i].degisim > 0) artanMag++;
+    if (liste[i].degisim !== null && liste[i].degisim < 0) azalanMag++;
+  }
+  var genelDegisim = top25 > 0 ? ((top26 - top25) / top25 * 100) : null;
+  var genelDeg = genelDegisim !== null
+    ? '<span style="color:' + (genelDegisim >= 0 ? 'var(--green)' : 'var(--red)') + '">' +
+      (genelDegisim >= 0 ? '▲' : '▼') + ' ' + Math.abs(genelDegisim).toFixed(1) + '%</span>'
+    : '—';
+
+  document.getElementById('kordaj-stats').innerHTML =
+    sc(liste.length, 'Mağaza Sayısı') +
+    sc(top25.toLocaleString('tr-TR'), '2025 Toplam Çekim') +
+    sc(top26.toLocaleString('tr-TR'), '2026 Toplam Çekim') +
+    sc(genelDeg, 'Genel Değişim') +
+    sc('<span style="color:var(--green)">▲ ' + artanMag + '</span>', 'Artan Mağaza') +
+    sc('<span style="color:var(--red)">▼ ' + azalanMag + '</span>', 'Azalan Mağaza');
+
+  // Tablo
+  var max26 = liste[0] ? Math.max(liste[0].adet25, liste[0].adet26) : 1;
+  var html = '';
+  for (var i = 0; i < liste.length; i++) {
+    var d = liste[i];
+    var degStr = '—', degClr = 'var(--text2)';
+    if (d.degisim !== null) {
+      degClr = d.degisim > 0 ? 'var(--green)' : d.degisim < 0 ? 'var(--red)' : 'var(--text2)';
+      degStr = (d.degisim > 0 ? '▲ +' : d.degisim < 0 ? '▼ ' : '') + Math.abs(d.degisim).toFixed(1) + '%';
+    }
+    // Trend çift progress bar
+    var bar25 = max26 > 0 ? (d.adet25 / max26 * 100).toFixed(1) : 0;
+    var bar26 = max26 > 0 ? (d.adet26 / max26 * 100).toFixed(1) : 0;
+    var trendHtml =
+      '<div style="display:flex;flex-direction:column;gap:3px;min-width:120px">' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<span style="font-size:10px;color:var(--text2);width:28px">\'25</span>' +
+          '<div style="flex:1;background:var(--surface2);border-radius:3px;height:6px">' +
+            '<div style="height:6px;border-radius:3px;background:var(--blue);width:' + bar25 + '%"></div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<span style="font-size:10px;color:var(--text2);width:28px">\'26</span>' +
+          '<div style="flex:1;background:var(--surface2);border-radius:3px;height:6px">' +
+            '<div style="height:6px;border-radius:3px;background:' + (d.adet26 >= d.adet25 ? 'var(--green)' : 'var(--orange)') + ';width:' + bar26 + '%"></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    html += '<tr>' +
+      '<td class="num" style="color:var(--accent);font-weight:700">' + d.sira + '</td>' +
+      '<td>' +
+        '<button onclick="openKordajModal(' + i + ')" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:4px 0;text-align:left">' +
+          '<span style="font-weight:700;color:var(--text);font-family:\'Rajdhani\',sans-serif;font-size:14px;border-bottom:1px dashed var(--border);padding-bottom:1px;transition:color .15s" ' +
+            'onmouseover="this.style.color=\'var(--accent)\';this.style.borderBottomColor=\'var(--accent)\'" ' +
+            'onmouseout="this.style.color=\'var(--text)\';this.style.borderBottomColor=\'var(--border)\'">' +
+            d.magaza +
+          '</span>' +
+          '<span style="font-size:10px;color:var(--text2)">↗</span>' +
+        '</button>' +
+      '</td>' +
+      '<td style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-weight:700;color:var(--blue)">' +
+        (d.adet25 || '—') +
+      '</td>' +
+      '<td style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-weight:700;color:' + (d.adet26 >= d.adet25 ? 'var(--green)' : 'var(--orange)') + '">' +
+        (d.adet26 || '—') +
+      '</td>' +
+      '<td style="text-align:center;font-weight:700;color:' + degClr + '">' + degStr + '</td>' +
+      '<td style="padding:8px 12px">' + trendHtml + '</td>' +
+      '<td style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-weight:800;color:var(--text)">' +
+        d.toplam +
+      '</td>' +
+      '</tr>';
+  }
+  document.getElementById('kordaj-tbody').innerHTML = html;
+}
+
+// ── KORDAJ POPUP
+function openKordajModal(idx) {
+  var liste = APP._kordajListe;
+  if (!liste || !liste[idx]) return;
+  var d = liste[idx];
+  var toplam = liste.reduce(function(s, x) { return s + x.toplam; }, 0);
+  var pay = toplam > 0 ? (d.toplam / toplam * 100).toFixed(1) : 0;
+
+  document.getElementById('kordaj-modal-name').textContent = d.magaza;
+  document.getElementById('kordaj-modal-sub').textContent  =
+    'Genel Sıralama: #' + d.sira + ' / ' + liste.length + ' Mağaza  ·  Toplam Pay: %' + pay;
+
+  var degClr = d.degisim > 0 ? 'var(--green)' : d.degisim < 0 ? 'var(--red)' : 'var(--text2)';
+  var degStr = d.degisim !== null
+    ? (d.degisim > 0 ? '▲ +' : '▼ ') + Math.abs(d.degisim).toFixed(1) + '%' : '—';
+
+  document.getElementById('kordaj-modal-stats').innerHTML =
+    sc(d.adet25 || '—', '2025 Çekim') +
+    sc(d.adet26 || '—', '2026 Çekim') +
+    sc('<span style="color:' + degClr + '">' + degStr + '</span>', 'Değişim') +
+    sc('#' + d.sira, 'Genel Sıra') +
+    sc('%' + pay, 'Toplam Pay');
+
+  // Karşılaştırma kartları
+  var maxAdet = Math.max(d.adet25, d.adet26, 1);
+  var bar25 = (d.adet25 / maxAdet * 100).toFixed(0);
+  var bar26 = (d.adet26 / maxAdet * 100).toFixed(0);
+
+  // Tüm mağazalar içindeki sıra bar (görsel)
+  var siraBar = liste.length > 0 ? ((liste.length - d.sira + 1) / liste.length * 100).toFixed(0) : 0;
+
+  var bodyHtml =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">' +
+
+    // 2025 Kartı
+    '<div style="background:var(--surface2);border:2px solid var(--blue);border-radius:12px;padding:20px;text-align:center">' +
+      '<div style="font-family:\'Bebas Neue\',sans-serif;font-size:16px;letter-spacing:3px;color:var(--blue);margin-bottom:10px">2025</div>' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:42px;font-weight:800;color:var(--text);line-height:1">' + (d.adet25 || 0) + '</div>' +
+      '<div style="font-size:12px;color:var(--text2);margin-top:6px">çekim adedi</div>' +
+      '<div style="margin-top:14px;background:var(--surface);border-radius:6px;height:8px">' +
+        '<div style="height:8px;border-radius:6px;background:var(--blue);width:' + bar25 + '%;transition:width .6s"></div>' +
+      '</div>' +
+    '</div>' +
+
+    // 2026 Kartı
+    '<div style="background:var(--surface2);border:2px solid ' + (d.adet26 >= d.adet25 ? 'var(--green)' : 'var(--orange)') + ';border-radius:12px;padding:20px;text-align:center">' +
+      '<div style="font-family:\'Bebas Neue\',sans-serif;font-size:16px;letter-spacing:3px;color:' + (d.adet26 >= d.adet25 ? 'var(--green)' : 'var(--orange)') + ';margin-bottom:10px">2026</div>' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:42px;font-weight:800;color:var(--text);line-height:1">' + (d.adet26 || 0) + '</div>' +
+      '<div style="font-size:12px;color:var(--text2);margin-top:6px">çekim adedi</div>' +
+      '<div style="margin-top:14px;background:var(--surface);border-radius:6px;height:8px">' +
+        '<div style="height:8px;border-radius:6px;background:' + (d.adet26 >= d.adet25 ? 'var(--green)' : 'var(--orange)') + ';width:' + bar26 + '%;transition:width .6s"></div>' +
+      '</div>' +
+    '</div>' +
+    '</div>' +
+
+    // Değişim & Sıralama
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">' +
+
+    // Yıllık değişim
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px">' +
+      '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">Yıldan Yıla Değişim</div>' +
+      '<div style="display:flex;align-items:center;gap:12px">' +
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:28px;font-weight:800;color:' + degClr + '">' + degStr + '</div>' +
+      '</div>' +
+      '<div style="margin-top:10px;font-size:13px;color:var(--text2)">' +
+        (d.adet25 > 0
+          ? (d.adet26 - d.adet25 >= 0
+            ? '<span style="color:var(--green)">+' + (d.adet26 - d.adet25) + ' çekim artış</span>'
+            : '<span style="color:var(--red)">' + (d.adet26 - d.adet25) + ' çekim düşüş</span>')
+          : '2025 verisi yok') +
+      '</div>' +
+    '</div>' +
+
+    // Genel sıralama
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:18px">' +
+      '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">Genel Sıralama</div>' +
+      '<div style="display:flex;align-items:baseline;gap:6px">' +
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:36px;font-weight:800;color:var(--accent)">#' + d.sira + '</div>' +
+        '<div style="font-size:14px;color:var(--text2)">/ ' + liste.length + ' mağaza</div>' +
+      '</div>' +
+      '<div style="margin-top:10px;background:var(--surface);border-radius:6px;height:8px">' +
+        '<div style="height:8px;border-radius:6px;background:linear-gradient(90deg,var(--accent),var(--orange));width:' + siraBar + '%;transition:width .6s"></div>' +
+      '</div>' +
+      '<div style="margin-top:6px;font-size:12px;color:var(--text2)">En yüksek çekim yapan ilk %' + (100 - siraBar) + '</div>' +
+    '</div>' +
+
+    '</div>';
+
+  document.getElementById('kordaj-modal-body').innerHTML = bodyHtml;
+  document.getElementById('kordaj-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeKordajModal(e) {
+  if (e && e.target !== document.getElementById('kordaj-modal-overlay')) return;
+  document.getElementById('kordaj-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// ESC ile her iki modalı da kapat
 document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape') closeMagModal(null);
+  if (e.key === 'Escape') {
+    closeMagModal(null);
+    closeKordajModal(null);
+  }
 });
+
 function sc(val,lbl){
   return '<div class="stat-card"><div class="stat-val">'+val+'</div><div class="stat-lbl">'+lbl+'</div></div>';
 }
