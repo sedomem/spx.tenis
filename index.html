@@ -241,6 +241,7 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
     <button class="nav-btn" onclick="showPage('sorumlular',this)">👤 Bölge Sorumluları</button>
     <button class="nav-btn" onclick="showPage('aylikhedef',this)">🏆 Aylık Hedef Tutma</button>
     <button class="nav-btn" onclick="showPage('kordaj',this)">🎸 Kordaj Çekimleri</button>
+    <button class="nav-btn" onclick="showPage('hocaliste',this)">📋 Hoca Listeleri</button>
     <button class="nav-btn" style="margin-left:auto;color:var(--accent)" onclick="loadFromSheets()">🔄 Yenile</button>
   </nav>
 
@@ -420,6 +421,105 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
 
 </div>
 
+  <!-- PAGE 8: TENİS HOCA LİSTELERİ -->
+  <div id="page-hocaliste" class="page">
+    <div class="page-title">Tenis Hoca Listeleri</div>
+    <div class="page-sub">Kayıtlı tenis hocaları · Mağaza, şehir ve bölge bazlı analiz</div>
+
+    <!-- GENEL İSTATİSTİKLER -->
+    <div class="stats-row" id="hl-stats"></div>
+
+    <!-- SEKMELİ NAVİGASYON -->
+    <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px;overflow-x:auto">
+      <button class="hl-tab active" onclick="hlTab('arama',this)"   style="background:none;border:none;padding:10px 20px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;color:var(--accent);border-bottom:2px solid var(--accent);margin-bottom:-2px;white-space:nowrap">🔍 ARAMA</button>
+      <button class="hl-tab"        onclick="hlTab('magaza',this)"  style="background:none;border:none;padding:10px 20px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap">🏪 MAĞAZA</button>
+      <button class="hl-tab"        onclick="hlTab('sehir',this)"   style="background:none;border:none;padding:10px 20px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap">🏙️ ŞEHİR</button>
+      <button class="hl-tab"        onclick="hlTab('harita',this)"  style="background:none;border:none;padding:10px 20px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap">🗺️ HARİTA</button>
+      <button class="hl-tab"        onclick="hlTab('analiz',this)"  style="background:none;border:none;padding:10px 20px;font-family:'Rajdhani',sans-serif;font-size:14px;font-weight:700;letter-spacing:1px;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap">📊 ANALİZ</button>
+    </div>
+
+    <!-- ARAMA SEKMESİ -->
+    <div id="hl-tab-arama" class="hl-section">
+      <div style="position:relative;margin-bottom:16px">
+        <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:18px;pointer-events:none">🔍</span>
+        <input id="hl-search-input" type="text" autocomplete="off"
+          placeholder="Hoca adı, Nebim No. veya Bölge Sorumlusu girin…"
+          oninput="hlSearch(this.value)"
+          style="width:100%;padding:14px 16px 14px 48px;background:var(--surface);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:15px;font-family:'Rajdhani',sans-serif;box-sizing:border-box;outline:none">
+        <div id="hl-ac" style="display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:10px;z-index:50;max-height:300px;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.4)"></div>
+      </div>
+      <div id="hl-search-result"></div>
+    </div>
+
+    <!-- MAĞAZA SEKMESİ -->
+    <div id="hl-tab-magaza" class="hl-section" style="display:none">
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>#</th><th>Mağaza</th><th style="text-align:center">Kayıtlı Hoca</th><th style="text-align:center">İlk Kayıt</th><th style="text-align:center">Son Kayıt</th><th style="min-width:120px">Dağılım</th></tr></thead>
+          <tbody id="hl-magaza-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ŞEHİR SEKMESİ -->
+    <div id="hl-tab-sehir" class="hl-section" style="display:none">
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <thead><tr><th>#</th><th>Şehir</th><th style="text-align:center">Hoca Sayısı</th><th style="text-align:center">Pay %</th><th style="min-width:160px">Görsel</th></tr></thead>
+          <tbody id="hl-sehir-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- HARİTA SEKMESİ -->
+    <div id="hl-tab-harita" class="hl-section" style="display:none">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">TÜRKİYE HOCA YOĞUNLUK HARİTASI</div>
+        <div id="hl-harita-container" style="position:relative;width:100%;max-width:900px;margin:0 auto"></div>
+      </div>
+      <div id="hl-harita-legend" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+    </div>
+
+    <!-- ANALİZ SEKMESİ -->
+    <div id="hl-tab-analiz" class="hl-section" style="display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="card"><div class="card-title">Yıllara Göre Kayıt Sayısı</div><div id="hl-yillik-chart"></div></div>
+        <div class="card"><div class="card-title">Aylara Göre Yoğunluk</div><div id="hl-aylik-chart"></div></div>
+      </div>
+      <div class="card"><div class="card-title">Bölge Sorumlularına Göre Hoca Sayısı (İlk 15)</div><div class="tbl-wrap"><table class="tbl"><thead><tr><th>#</th><th>Bölge Sorumlusu</th><th style="text-align:center">Hoca Sayısı</th><th style="min-width:150px">Dağılım</th></tr></thead><tbody id="hl-bolge-tbody"></tbody></table></div></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- HOCA LİSTE DETAY MODAL -->
+<div class="mag-modal-overlay" id="hl-modal-overlay" onclick="hlCloseModal(event)">
+  <div class="mag-modal" id="hl-modal" style="max-width:640px">
+    <div class="mag-modal-header">
+      <div>
+        <div class="mag-modal-title" id="hl-modal-name">—</div>
+        <div style="font-size:12px;color:var(--text2);letter-spacing:1px;margin-top:2px" id="hl-modal-sub"></div>
+      </div>
+      <button class="mag-modal-close" onclick="hlCloseModal(null)">✕</button>
+    </div>
+    <div class="mag-modal-body" id="hl-modal-body"></div>
+  </div>
+</div>
+
+<!-- MAĞAZA HOCA DETAY MODAL -->
+<div class="mag-modal-overlay" id="hl-mag-modal-overlay" onclick="hlCloseMagModal(event)">
+  <div class="mag-modal" id="hl-mag-modal">
+    <div class="mag-modal-header">
+      <div>
+        <div class="mag-modal-title" id="hl-mag-modal-name">—</div>
+        <div style="font-size:12px;color:var(--text2);letter-spacing:1px;margin-top:2px" id="hl-mag-modal-sub"></div>
+      </div>
+      <button class="mag-modal-close" onclick="hlCloseMagModal(null)">✕</button>
+    </div>
+    <div class="mag-modal-body" id="hl-mag-modal-body"></div>
+  </div>
+</div>
+
 <!-- KORDAJ POPUP MODAL -->
 <div class="mag-modal-overlay" id="kordaj-modal-overlay" onclick="closeKordajModal(event)">
   <div class="mag-modal" id="kordaj-modal">
@@ -474,7 +574,8 @@ var SHEETS = {
   urun:       'Mağaza Ürün İstek Sıralaması',
   sorumlular: 'Tenis Bölge Sorumluları',
   aylikhedef: 'Aylık Hedef Tutma',
-  kordaj:     'Kordaj Çekimleri'
+  kordaj:     'Kordaj Çekimleri',
+  hocaliste:  'Tenis Hoca Listeleri'
 };
 
 // ── STATE
@@ -628,6 +729,7 @@ function processData(sheets) {
   if (sheets.sorumlular)  buildSorumlular(sheets.sorumlular);
   if (sheets.aylikhedef)  buildAylikHedef(sheets.aylikhedef);
   if (sheets.kordaj)      buildKordaj(sheets.kordaj);
+  if (sheets.hocaliste)   buildHocaListesi(sheets.hocaliste);
 }
 
 // ════════════════════════════════════
@@ -1678,6 +1780,398 @@ document.addEventListener('keydown', function(e) {
     closeKordajModal(null);
   }
 });
+
+// ════════════════════════════════════
+// PAGE 8: TENİS HOCA LİSTELERİ
+// Sütunlar: Tarih | Mağaza | Bölge Sorumlusu | Nebim No. | Tenis Hocası | Şehir | Kulüp/Ders Yeri
+// ════════════════════════════════════
+
+// Türkiye şehir koordinatları (SVG 900x480 viewBox)
+var TR_CITIES = {
+  'İSTANBUL':[158,88],'ANKARA':[332,168],'İZMİR':[110,228],'BURSA':[192,128],
+  'ANTALYA':[268,348],'ADANA':[390,318],'KONYA':[318,268],'KAYSERİ':[418,228],
+  'ESKİŞEHİR':[248,162],'GAZİANTEP':[448,318],'TRABZON':[535,95],'SAMSUN':[455,98],
+  'DENİZLİ':[185,268],'MALATYA':[492,228],'DİYARBAKIR':[548,258],'ERZURUM':[598,162],
+  'KARS':[658,148],'BOLU':[298,130],'MUĞLA':[185,318],'AYDIN':[145,268],
+  'MANİSA':[128,208],'BALIKESİR':[158,168],'ÇANAKKALE':[115,148],'EDİRNE':[105,108],
+  'TEKİRDAĞ':[128,108],'KOCAELİ':[208,118],'SAKARYA':[232,125],'DÜZCE':[265,122],
+  'ZONGULDAK':[298,112],'KASTAMONU':[358,118],'SINOP':[408,105],'GİRESUN':[505,100],
+  'RIZE':[560,92],'ARTVİN':[590,88],'ARDAHAN':[652,138],'IĞDIR':[672,168],
+  'VAN':[648,228],'BİTLİS':[598,238],'MUŞ':[582,228],'BINGÖL':[558,218],
+  'TUNCELİ':[528,208],'ELAZIĞ':[512,218],'HAKKARİ':[638,278],'ŞIRNAK':[598,278],
+  'MARDİN':[548,278],'BATMAN':[568,268],'SİİRT':[588,268],'URFA':[482,298],
+  'ŞANLIURFA':[482,298],'ADIYAMAN':[462,298],'KAHRAMANMARAŞ':[432,298],'OSMANİYE':[412,318],
+  'HATAY':[398,348],'MERSİN':[358,348],'KARAMAN':[338,308],'NİĞDE':[368,268],
+  'KIRŞEHİR':[368,198],'AKSARAY':[338,248],'NEVŞEHİR':[388,238],'YOZGAT':[408,188],
+  'TOKAT':[448,148],'AMASYA':[428,128],'ÇORUM':[398,138],'SİVAS':[478,188],
+  'ERZINCAN':[548,188],'BAYBURT':[562,148],'GÜMÜŞHANE':[548,128],'AFYONKARAHİSAR':[225,228],
+  'KÜTAHYA':[212,188],'UŞAK':[172,228],'ISPARTA':[248,308],'BURDUR':[225,318],
+  'MUĞLA':[185,318]
+};
+
+function buildHocaListesi(gvizData) {
+  var rows = gvizToRows(gvizData);
+  if (!rows || rows.length === 0) return;
+
+  // Veriyi parse et
+  var kayitlar = [];
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    var tarih   = r['Tarih']           || r[0] || '';
+    var magaza  = (r['Mağaza']         || r['Magaza']  || r[1] || '').toString().trim();
+    var bolge   = (r['Bölge Sorumlusu']|| r['Bolge Sorumlusu'] || r[2] || '').toString().trim();
+    var nebim   = (r['Nebim No.']      || r['Nebim No'] || r[3] || '').toString().trim();
+    var hoca    = (r['Tenis Hocası']   || r['Tenis Hocasi'] || r[4] || '').toString().trim();
+    var sehir   = (r['Şehir']          || r['Sehir']  || r[5] || '').toString().trim().toUpperCase();
+    var kulup   = (r['Kulüp Veya Ders Verdiği Yer'] || r['Kulup'] || r[6] || '').toString().trim();
+
+    if (!hoca || hoca === 'Tenis Hocası' || hoca === 'Tenis Hocasi') continue;
+
+    // Tarih parse
+    var tarihStr = '';
+    var yil = null, ay = null;
+    if (tarih) {
+      var ts = tarih.toString();
+      // GViz Date format: "Date(2021,10,21)" → ay 0-indexed
+      var dm = ts.match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (dm) {
+        yil = parseInt(dm[1]);
+        ay  = parseInt(dm[2]) + 1; // 0-indexed → 1-indexed
+        tarihStr = dm[3] + '.' + (ay<10?'0':'')+ay + '.' + yil;
+      } else {
+        tarihStr = ts;
+        var parts = ts.split(/[.\/-]/);
+        if (parts.length >= 3) {
+          // dd.mm.yyyy or yyyy-mm-dd
+          if (parts[0].length === 4) { yil=parseInt(parts[0]); ay=parseInt(parts[1]); }
+          else { yil=parseInt(parts[2]); ay=parseInt(parts[1]); }
+        }
+      }
+    }
+
+    kayitlar.push({ tarih:tarihStr, magaza:magaza, bolge:bolge, nebim:nebim,
+                    hoca:hoca, sehir:sehir, kulup:kulup, yil:yil, ay:ay });
+  }
+
+  APP._hlKayitlar = kayitlar;
+
+  // ── GENEL İSTATİSTİKLER
+  var magazaSet={}, sehirSet={}, bolgeSet={}, yilSet={};
+  for (var i=0;i<kayitlar.length;i++) {
+    var k=kayitlar[i];
+    if(k.magaza) magazaSet[k.magaza]=1;
+    if(k.sehir)  sehirSet[k.sehir]=1;
+    if(k.bolge)  bolgeSet[k.bolge]=1;
+    if(k.yil)    yilSet[k.yil]=1;
+  }
+  document.getElementById('hl-stats').innerHTML =
+    sc(kayitlar.length,              'Toplam Kayıt') +
+    sc(Object.keys(magazaSet).length,'Mağaza') +
+    sc(Object.keys(sehirSet).length, 'Şehir') +
+    sc(Object.keys(bolgeSet).length, 'Bölge Sorumlusu') +
+    sc(Object.keys(yilSet).length,   'Yıl Aralığı');
+
+  // ── MAĞAZA TABLOSU
+  var magMap = {};
+  for (var i=0;i<kayitlar.length;i++) {
+    var k=kayitlar[i];
+    if(!k.magaza) continue;
+    if(!magMap[k.magaza]) magMap[k.magaza]={count:0,ilk:'',son:'',yillar:{},kayitlar:[]};
+    magMap[k.magaza].count++;
+    magMap[k.magaza].kayitlar.push(k);
+    if(k.tarih && (!magMap[k.magaza].ilk || k.tarih < magMap[k.magaza].ilk)) magMap[k.magaza].ilk=k.tarih;
+    if(k.tarih && k.tarih > magMap[k.magaza].son) magMap[k.magaza].son=k.tarih;
+    if(k.yil) magMap[k.magaza].yillar[k.yil]=(magMap[k.magaza].yillar[k.yil]||0)+1;
+  }
+  var magListe = Object.keys(magMap).map(function(m){return{magaza:m,data:magMap[m]};});
+  magListe.sort(function(a,b){return b.data.count-a.data.count;});
+  APP._hlMagListe = magListe;
+  var maxMag = magListe[0] ? magListe[0].data.count : 1;
+  var htmlMag = '';
+  for (var i=0;i<magListe.length;i++) {
+    var m=magListe[i]; var bw=(m.data.count/maxMag*100).toFixed(0);
+    htmlMag += '<tr>' +
+      '<td class="num" style="color:var(--accent);font-weight:700">'+(i+1)+'</td>' +
+      '<td><button onclick="hlOpenMagModal('+i+')" style="background:none;border:none;cursor:pointer;text-align:left;padding:4px 0;display:flex;align-items:center;gap:8px">' +
+        '<span style="font-weight:700;color:var(--text);font-family:\'Rajdhani\',sans-serif;font-size:14px;border-bottom:1px dashed var(--border)" ' +
+          'onmouseover="this.style.color=\'var(--accent)\'" onmouseout="this.style.color=\'var(--text)\'">' + m.magaza + '</span>' +
+        '<span style="font-size:10px;color:var(--text2)">↗</span>' +
+      '</button></td>' +
+      '<td style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-weight:800;color:var(--blue);font-size:16px">'+m.data.count+'</td>' +
+      '<td style="text-align:center;font-size:12px;color:var(--text2)">'+m.data.ilk+'</td>' +
+      '<td style="text-align:center;font-size:12px;color:var(--text2)">'+m.data.son+'</td>' +
+      '<td style="padding:8px 12px"><div style="background:var(--surface2);border-radius:4px;height:8px"><div style="height:8px;border-radius:4px;background:var(--blue);width:'+bw+'%;transition:width .6s"></div></div></td>' +
+      '</tr>';
+  }
+  document.getElementById('hl-magaza-tbody').innerHTML = htmlMag;
+
+  // ── ŞEHİR TABLOSU
+  var sehirMap = {};
+  for (var i=0;i<kayitlar.length;i++) {
+    var k=kayitlar[i];
+    if(!k.sehir) continue;
+    sehirMap[k.sehir]=(sehirMap[k.sehir]||0)+1;
+  }
+  var sehirListe = Object.keys(sehirMap).map(function(s){return{sehir:s,count:sehirMap[s]};});
+  sehirListe.sort(function(a,b){return b.count-a.count;});
+  APP._hlSehirListe = sehirListe;
+  var maxSeh = sehirListe[0] ? sehirListe[0].count : 1;
+  var topSeh = kayitlar.filter(function(k){return k.sehir;}).length;
+  var htmlSeh = '';
+  for (var i=0;i<sehirListe.length;i++) {
+    var s=sehirListe[i]; var bw=(s.count/maxSeh*100).toFixed(0);
+    var pay=(s.count/topSeh*100).toFixed(1);
+    var clr = i===0?'var(--accent)': i<3?'var(--orange)': i<10?'var(--blue)':'var(--text2)';
+    htmlSeh += '<tr>' +
+      '<td class="num" style="color:'+clr+';font-weight:700">'+(i+1)+'</td>' +
+      '<td style="font-weight:700">'+s.sehir+'</td>' +
+      '<td style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-weight:800;color:'+clr+'">'+s.count+'</td>' +
+      '<td style="text-align:center;font-size:12px;color:var(--text2)">%'+pay+'</td>' +
+      '<td style="padding:8px 12px">' +
+        '<div style="background:var(--surface2);border-radius:4px;height:10px">' +
+          '<div style="height:10px;border-radius:4px;background:'+clr+';width:'+bw+'%;transition:width .6s"></div>' +
+        '</div>' +
+      '</td>' +
+      '</tr>';
+  }
+  document.getElementById('hl-sehir-tbody').innerHTML = htmlSeh;
+
+  // ── TÜRKİYE HARİTASI (SVG)
+  hlBuildMap(sehirListe, maxSeh);
+
+  // ── ANALİZ: Yıllık chart
+  var yilMap={};
+  for (var i=0;i<kayitlar.length;i++) { if(kayitlar[i].yil) yilMap[kayitlar[i].yil]=(yilMap[kayitlar[i].yil]||0)+1; }
+  var yillar=Object.keys(yilMap).sort();
+  var maxY=Math.max.apply(null,yillar.map(function(y){return yilMap[y];}));
+  var yilHtml='<div style="display:flex;align-items:flex-end;gap:8px;height:140px;padding:0 4px">';
+  for(var i=0;i<yillar.length;i++){
+    var y=yillar[i]; var h=(yilMap[y]/maxY*120).toFixed(0);
+    var clr=y==='2025'?'var(--accent)':y==='2026'?'var(--green)':'var(--blue)';
+    yilHtml+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:11px;font-weight:700;color:'+clr+'">'+yilMap[y]+'</div>' +
+      '<div style="width:100%;height:'+h+'px;background:'+clr+';border-radius:4px 4px 0 0;transition:height .6s;min-height:4px"></div>' +
+      '<div style="font-size:11px;color:var(--text2);font-weight:700">'+y+'</div>' +
+    '</div>';
+  }
+  yilHtml+='</div>';
+  document.getElementById('hl-yillik-chart').innerHTML = yilHtml;
+
+  // ── ANALİZ: Aylık chart
+  var ayMap={1:0,2:0,3:0,4:0,5:0,6:0,7:0,8:0,9:0,10:0,11:0,12:0};
+  var ayAdlar=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+  for(var i=0;i<kayitlar.length;i++){if(kayitlar[i].ay) ayMap[kayitlar[i].ay]=(ayMap[kayitlar[i].ay]||0)+1;}
+  var maxAy=Math.max.apply(null,Object.values(ayMap));
+  var ayHtml='<div style="display:flex;align-items:flex-end;gap:4px;height:140px;padding:0 4px">';
+  for(var a=1;a<=12;a++){
+    var cnt=ayMap[a]; var h=maxAy>0?(cnt/maxAy*120).toFixed(0):0;
+    var clr=cnt===maxAy?'var(--accent)':cnt>maxAy*0.7?'var(--orange)':'var(--blue)';
+    ayHtml+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:10px;font-weight:700;color:'+clr+'">'+(cnt||'')+' </div>' +
+      '<div style="width:100%;height:'+h+'px;background:'+clr+';border-radius:3px 3px 0 0;min-height:2px"></div>' +
+      '<div style="font-size:9px;color:var(--text2)">'+ayAdlar[a-1]+'</div>' +
+    '</div>';
+  }
+  ayHtml+='</div>';
+  document.getElementById('hl-aylik-chart').innerHTML = ayHtml;
+
+  // ── ANALİZ: Bölge sorumlusu
+  var bolgeMap={};
+  for(var i=0;i<kayitlar.length;i++){var k=kayitlar[i];if(k.bolge) bolgeMap[k.bolge]=(bolgeMap[k.bolge]||0)+1;}
+  var bolgeListe=Object.keys(bolgeMap).map(function(b){return{bolge:b,count:bolgeMap[b]};}).sort(function(a,b){return b.count-a.count;}).slice(0,15);
+  var maxB=bolgeListe[0]?bolgeListe[0].count:1;
+  var htmlB='';
+  for(var i=0;i<bolgeListe.length;i++){
+    var b=bolgeListe[i]; var bw=(b.count/maxB*100).toFixed(0);
+    htmlB+='<tr>'+
+      '<td class="num" style="color:var(--accent);font-weight:700">'+(i+1)+'</td>'+
+      '<td style="font-weight:600">'+b.bolge+'</td>'+
+      '<td style="text-align:center;font-family:\'IBM Plex Mono\',monospace;font-weight:800;color:var(--blue)">'+b.count+'</td>'+
+      '<td style="padding:8px 12px"><div style="background:var(--surface2);border-radius:4px;height:8px"><div style="height:8px;border-radius:4px;background:var(--blue);width:'+bw+'%"></div></div></td>'+
+      '</tr>';
+  }
+  document.getElementById('hl-bolge-tbody').innerHTML = htmlB;
+}
+
+// ── TÜRKİYE HARİTASI
+function hlBuildMap(sehirListe, maxCount) {
+  var container = document.getElementById('hl-harita-container');
+  if (!container) return;
+
+  var maxR = 28, minR = 5;
+  // SVG Türkiye outline (basitleştirilmiş path)
+  var trPath = 'M108,148 L95,138 L88,128 L92,118 L105,112 L118,108 L132,105 L148,102 L155,95 L165,88 L178,85 L195,88 L208,92 L215,88 L225,90 L238,88 L250,92 L262,88 L272,92 L285,90 L298,92 L315,88 L328,88 L342,90 L358,88 L372,90 L385,88 L398,92 L412,90 L428,88 L445,92 L462,90 L478,88 L495,90 L512,88 L528,88 L545,90 L560,88 L575,88 L592,85 L608,82 L622,80 L638,78 L652,75 L665,78 L672,88 L678,102 L675,115 L668,128 L660,142 L652,155 L648,168 L652,182 L658,195 L662,208 L658,222 L648,235 L638,248 L628,262 L618,275 L605,285 L592,292 L578,295 L562,298 L548,298 L535,302 L520,310 L505,318 L492,322 L478,328 L465,335 L452,342 L438,348 L425,355 L412,358 L398,358 L385,355 L372,352 L358,358 L345,362 L332,362 L318,358 L305,355 L292,352 L278,355 L265,358 L252,358 L238,355 L225,352 L212,348 L198,342 L185,335 L172,328 L162,322 L152,315 L142,308 L132,302 L122,295 L112,288 L102,278 L95,268 L90,255 L88,242 L90,228 L95,215 L100,202 L105,188 L108,175 L108,162 Z';
+
+  var svgDots = '';
+  var legendHtml = '';
+  for (var i = 0; i < sehirListe.length; i++) {
+    var s = sehirListe[i];
+    var coords = TR_CITIES[s.sehir] || TR_CITIES[s.sehir.toUpperCase()];
+    if (!coords) continue;
+    var r = minR + (s.count / maxCount) * (maxR - minR);
+    var opacity = 0.5 + (s.count / maxCount) * 0.5;
+    var clr = s.count === maxCount ? '#E8282B' :
+              s.count > maxCount * 0.5 ? '#F59E0B' :
+              s.count > maxCount * 0.2 ? '#3B82F6' : '#6B7280';
+    svgDots +=
+      '<circle cx="'+coords[0]+'" cy="'+coords[1]+'" r="'+r.toFixed(1)+'" fill="'+clr+'" fill-opacity="'+opacity.toFixed(2)+'" stroke="'+clr+'" stroke-width="1.5" stroke-opacity="0.8">' +
+        '<title>'+s.sehir+': '+s.count+' hoca</title>' +
+      '</circle>' +
+      '<text x="'+coords[0]+'" y="'+(coords[1]+r+9)+'" text-anchor="middle" font-size="8" fill="var(--text2)" font-family="IBM Plex Mono,monospace" font-weight="700">'+s.count+'</text>';
+  }
+
+  container.innerHTML =
+    '<svg viewBox="75 70 620 310" width="100%" style="filter:drop-shadow(0 2px 8px rgba(0,0,0,.3))">' +
+      '<path d="'+trPath+'" fill="var(--surface2)" stroke="var(--border)" stroke-width="1.5"/>' +
+      svgDots +
+    '</svg>';
+
+  document.getElementById('hl-harita-legend').innerHTML =
+    '<div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--text2)">' +
+    '<span>⬤ <span style="color:#E8282B">En yüksek</span></span>' +
+    '<span>⬤ <span style="color:#F59E0B">&gt;%50</span></span>' +
+    '<span>⬤ <span style="color:#3B82F6">&gt;%20</span></span>' +
+    '<span>⬤ <span style="color:#6B7280">Diğer</span></span>' +
+    '<span style="margin-left:8px;color:var(--text2)">Daire büyüklüğü hoca sayısını gösterir</span>' +
+    '</div>';
+}
+
+// ── ARAMA
+function hlSearch(val) {
+  var ac = document.getElementById('hl-ac');
+  var kayitlar = APP._hlKayitlar || [];
+  if (!val || val.length < 2) { ac.style.display='none'; document.getElementById('hl-search-result').innerHTML=''; return; }
+  var q = val.toLowerCase();
+  var eslesler = [];
+  for (var i=0;i<kayitlar.length;i++) {
+    var k=kayitlar[i];
+    if ((k.hoca||'').toLowerCase().indexOf(q)!==-1 ||
+        (k.nebim||'').toLowerCase().indexOf(q)!==-1 ||
+        (k.bolge||'').toLowerCase().indexOf(q)!==-1) {
+      if (eslesler.length < 10) eslesler.push(i);
+    }
+  }
+  if (!eslesler.length) { ac.style.display='none'; return; }
+  ac.style.display='block';
+  var html='';
+  for (var j=0;j<eslesler.length;j++) {
+    var k=kayitlar[eslesler[j]];
+    html+='<div onclick="hlOpenModal('+eslesler[j]+')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--border);transition:background .15s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+      '<div style="font-weight:700;font-family:\'Rajdhani\',sans-serif;font-size:14px">'+k.hoca+'</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:2px">'+k.magaza+' · '+k.bolge+' · Nebim: '+k.nebim+'</div>' +
+    '</div>';
+  }
+  ac.innerHTML = html;
+  document.addEventListener('click', function close(e){ if(!e.target.closest('#hl-ac')&&!e.target.closest('#hl-search-input')){ac.style.display='none';document.removeEventListener('click',close);} });
+}
+
+// ── HOCA DETAY MODAL
+function hlOpenModal(idx) {
+  var kayitlar = APP._hlKayitlar || [];
+  var k = kayitlar[idx];
+  if (!k) return;
+  document.getElementById('hl-modal-name').textContent = k.hoca;
+  document.getElementById('hl-modal-sub').textContent  = 'Nebim No: ' + (k.nebim||'—') + '  ·  Mağaza: ' + (k.magaza||'—');
+  document.getElementById('hl-ac').style.display='none';
+  document.getElementById('hl-search-result').innerHTML='';
+
+  var bodyHtml =
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+    hlInfoCard('🏪 Mağaza',         k.magaza   || '—') +
+    hlInfoCard('👤 Bölge Sorumlusu',k.bolge    || '—') +
+    hlInfoCard('🆔 Nebim No.',      k.nebim    || '—') +
+    hlInfoCard('📅 Kayıt Tarihi',   k.tarih    || '—') +
+    hlInfoCard('🏙️ Şehir',          k.sehir    || '—') +
+    hlInfoCard('🎾 Kulüp / Ders Yeri', k.kulup || '—') +
+    '</div>';
+  document.getElementById('hl-modal-body').innerHTML = bodyHtml;
+  document.getElementById('hl-modal-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function hlCloseModal(e) {
+  if (e && e.target !== document.getElementById('hl-modal-overlay')) return;
+  document.getElementById('hl-modal-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+function hlInfoCard(lbl,val){
+  return '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px">' +
+    '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:6px">'+lbl+'</div>' +
+    '<div style="font-weight:700;font-size:14px;color:var(--text)">'+val+'</div>' +
+  '</div>';
+}
+
+// ── MAĞAZA DETAY MODAL (yıl/ay breakdown)
+function hlOpenMagModal(idx) {
+  var magListe = APP._hlMagListe || [];
+  var m = magListe[idx];
+  if (!m) return;
+  document.getElementById('hl-mag-modal-name').textContent = m.magaza;
+  document.getElementById('hl-mag-modal-sub').textContent  = m.data.count + ' kayıtlı hoca  ·  Sıra: #' + (idx+1);
+
+  // Yıllık breakdown
+  var yilMap={};
+  var ayMap={};
+  var kayitlar=m.data.kayitlar;
+  for(var i=0;i<kayitlar.length;i++){
+    var k=kayitlar[i];
+    if(k.yil) yilMap[k.yil]=(yilMap[k.yil]||0)+1;
+    if(k.yil&&k.ay) {var key=k.yil+'-'+(k.ay<10?'0':'')+k.ay; ayMap[key]=(ayMap[key]||0)+1;}
+  }
+  var yillar=Object.keys(yilMap).sort();
+  var maxY=Math.max.apply(null,yillar.map(function(y){return yilMap[y];}));
+
+  var yilHtml='<div style="display:flex;align-items:flex-end;gap:10px;height:120px;margin-bottom:6px">';
+  for(var i=0;i<yillar.length;i++){
+    var y=yillar[i]; var h=(yilMap[y]/maxY*100).toFixed(0);
+    yilHtml+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;font-weight:800;color:var(--accent)">'+yilMap[y]+'</div>' +
+      '<div style="width:100%;height:'+h+'px;background:var(--blue);border-radius:4px 4px 0 0;min-height:4px"></div>' +
+      '<div style="font-size:11px;color:var(--text2)">'+y+'</div>' +
+    '</div>';
+  }
+  yilHtml+='</div>';
+
+  // Hoca listesi
+  var hocaHtml='<div style="max-height:220px;overflow-y:auto;margin-top:4px">';
+  for(var i=0;i<kayitlar.length;i++){
+    var k=kayitlar[i];
+    hocaHtml+='<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">' +
+      '<span style="font-weight:600">'+k.hoca+'</span>' +
+      '<span style="color:var(--text2);font-size:11px">'+k.tarih+'</span>' +
+    '</div>';
+  }
+  hocaHtml+='</div>';
+
+  document.getElementById('hl-mag-modal-body').innerHTML =
+    '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">YILLARA GÖRE KAYIT</div>' +
+    yilHtml +
+    '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin:14px 0 8px">KAYITLI HOCALAR ('+kayitlar.length+')</div>' +
+    hocaHtml;
+
+  document.getElementById('hl-mag-modal-overlay').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function hlCloseMagModal(e) {
+  if (e && e.target !== document.getElementById('hl-mag-modal-overlay')) return;
+  document.getElementById('hl-mag-modal-overlay').classList.remove('open');
+  document.body.style.overflow='';
+}
+
+// ── SEKME GEÇİŞİ
+function hlTab(id, btn) {
+  var sections=['arama','magaza','sehir','harita','analiz'];
+  for(var i=0;i<sections.length;i++){
+    var el=document.getElementById('hl-tab-'+sections[i]);
+    if(el) el.style.display = sections[i]===id ? '' : 'none';
+  }
+  var tabs=document.querySelectorAll('.hl-tab');
+  for(var i=0;i<tabs.length;i++){
+    tabs[i].style.color='var(--text2)';
+    tabs[i].style.borderBottomColor='transparent';
+  }
+  btn.style.color='var(--accent)';
+  btn.style.borderBottomColor='var(--accent)';
+}
 
 function sc(val,lbl){
   return '<div class="stat-card"><div class="stat-val">'+val+'</div><div class="stat-lbl">'+lbl+'</div></div>';
