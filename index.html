@@ -566,6 +566,20 @@ body { background:var(--bg); color:var(--text); font-family:'Rajdhani',sans-seri
 
 </div>
 
+<!-- HAKEDİŞ HOCA DETAY MODAL -->
+<div class="mag-modal-overlay" id="hk-modal-overlay" onclick="hkClosePopup(event)">
+  <div class="mag-modal" style="max-width:560px">
+    <div class="mag-modal-header">
+      <div>
+        <div class="mag-modal-title" id="hk-modal-name">—</div>
+        <div style="font-size:12px;color:var(--text2);letter-spacing:1px;margin-top:2px" id="hk-modal-sub"></div>
+      </div>
+      <button class="mag-modal-close" onclick="hkClosePopup(null)">✕</button>
+    </div>
+    <div class="mag-modal-body" id="hk-modal-body"></div>
+  </div>
+</div>
+
 <!-- KORDAJ POPUP MODAL -->
 <div class="mag-modal-overlay" id="kordaj-modal-overlay" onclick="closeKordajModal(event)">
   <div class="mag-modal" id="kordaj-modal">
@@ -1826,6 +1840,9 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') {
     closeMagModal(null);
     closeKordajModal(null);
+    hlCloseModal(null);
+    hlCloseMagModal(null);
+    hkClosePopup(null);
   }
 });
 
@@ -2370,7 +2387,7 @@ function hkRender() {
     var hPctStr = d.hPct ? (d.hPct < 1 ? (d.hPct*100).toFixed(0) : d.hPct.toFixed(0)) + '%' : '—';
     var puanStr = d.puan ? new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2}).format(d.puan) : '—';
     html +=
-      '<tr style="transition:background .1s" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
+      '<tr style="transition:background .1s;cursor:pointer" onclick="hkOpenPopup('+i+')" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">' +
       '<td class="num" style="color:var(--text2);font-size:12px">'+(i+1)+'</td>' +
       '<td style="font-family:\'IBM Plex Mono\',monospace;font-size:12px;color:var(--text2)">'+d.kod+'</td>' +
       '<td style="font-weight:700">' +
@@ -2402,6 +2419,113 @@ function hkRender() {
     '</tr>';
 
   if (countEl) countEl.textContent = liste.length + ' / ' + (APP._hkListe||[]).length + ' kayıt gösteriliyor';
+}
+
+// ── HAKEDİŞ DETAY POPUP
+function hkOpenPopup(idx) {
+  var liste = APP._hkFiltered || [];
+  var d = liste[idx];
+  if (!d) return;
+
+  // Genel sıradaki yeri (tüm liste içinde)
+  var tumListe = APP._hkListe || [];
+  var genelSira = 1;
+  for (var i = 0; i < tumListe.length; i++) {
+    if (tumListe[i].kod === d.kod && tumListe[i].ad === d.ad) { genelSira = i + 1; break; }
+  }
+
+  // Toplamdan pay
+  var genelTop = 0;
+  for (var i = 0; i < tumListe.length; i++) genelTop += tumListe[i].toplam;
+  var pay = genelTop > 0 ? (d.toplam / genelTop * 100).toFixed(2) : '0';
+
+  // Alış/Yönlendirme oranı
+  var alisPay = d.toplam > 0 ? (d.alis / d.toplam * 100).toFixed(1) : 0;
+  var yonPay  = d.toplam > 0 ? (d.yon  / d.toplam * 100).toFixed(1) : 0;
+
+  var hPctStr = d.hPct ? d.hPct.toFixed(0) + '%' : '—';
+  var puanFmt = d.puan ? new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2}).format(d.puan) : '—';
+
+  document.getElementById('hk-modal-name').textContent = d.ad;
+  document.getElementById('hk-modal-sub').textContent  =
+    'Müşteri Kodu: ' + d.kod + '  ·  Genel Sıra: #' + genelSira + ' / ' + tumListe.length;
+
+  var body =
+    // 3 ana tutar kartı
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">' +
+
+    '<div style="background:var(--surface2);border:2px solid var(--blue);border-radius:10px;padding:14px;text-align:center">' +
+      '<div style="font-size:10px;color:var(--blue);letter-spacing:1.5px;font-weight:700;text-transform:uppercase;margin-bottom:6px">Alış</div>' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:16px;font-weight:800;color:var(--blue)">' + fmtN(d.alis) + '</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:4px">%' + alisPay + ' payı</div>' +
+      '<div style="margin-top:8px;background:var(--surface);border-radius:3px;height:4px">' +
+        '<div style="height:4px;border-radius:3px;background:var(--blue);width:' + alisPay + '%;transition:width .6s"></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div style="background:var(--surface2);border:2px solid var(--orange);border-radius:10px;padding:14px;text-align:center">' +
+      '<div style="font-size:10px;color:var(--orange);letter-spacing:1.5px;font-weight:700;text-transform:uppercase;margin-bottom:6px">Yönlendirme</div>' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:16px;font-weight:800;color:var(--orange)">' + fmtN(d.yon) + '</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:4px">%' + yonPay + ' payı</div>' +
+      '<div style="margin-top:8px;background:var(--surface);border-radius:3px;height:4px">' +
+        '<div style="height:4px;border-radius:3px;background:var(--orange);width:' + yonPay + '%;transition:width .6s"></div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div style="background:var(--surface2);border:2px solid var(--green);border-radius:10px;padding:14px;text-align:center">' +
+      '<div style="font-size:10px;color:var(--green);letter-spacing:1.5px;font-weight:700;text-transform:uppercase;margin-bottom:6px">Toplam</div>' +
+      '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:16px;font-weight:800;color:var(--green)">' + fmtN(d.toplam) + '</div>' +
+      '<div style="font-size:11px;color:var(--text2);margin-top:4px">%' + pay + ' genel pay</div>' +
+      '<div style="margin-top:8px;background:var(--surface);border-radius:3px;height:4px">' +
+        '<div style="height:4px;border-radius:3px;background:var(--green);width:' + Math.min(parseFloat(pay)*5,100) + '%;transition:width .6s"></div>' +
+      '</div>' +
+    '</div>' +
+    '</div>' +
+
+    // Hakediş ve Puan kartları
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">' +
+
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;align-items:center;gap:14px">' +
+      '<div style="font-size:32px">📊</div>' +
+      '<div>' +
+        '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Hakediş Oranı</div>' +
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:28px;font-weight:800;color:var(--accent)">' + hPctStr + '</div>' +
+      '</div>' +
+    '</div>' +
+
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px;display:flex;align-items:center;gap:14px">' +
+      '<div style="font-size:32px">⭐</div>' +
+      '<div>' +
+        '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:4px">Hakediş Puanı</div>' +
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:22px;font-weight:800;color:var(--accent)">' + puanFmt + '</div>' +
+      '</div>' +
+    '</div>' +
+    '</div>' +
+
+    // Genel sıralama bar
+    '<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:16px">' +
+      '<div style="font-size:11px;color:var(--text2);letter-spacing:1px;text-transform:uppercase;margin-bottom:10px">Genel Sıralama</div>' +
+      '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:8px">' +
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-size:32px;font-weight:800;color:var(--accent)">#' + genelSira + '</div>' +
+        '<div style="font-size:14px;color:var(--text2)">/ ' + tumListe.length + ' hoca</div>' +
+      '</div>' +
+      '<div style="background:var(--surface);border-radius:4px;height:8px">' +
+        '<div style="height:8px;border-radius:4px;background:linear-gradient(90deg,var(--accent),var(--orange));width:' +
+          ((tumListe.length - genelSira + 1) / tumListe.length * 100).toFixed(0) + '%;transition:width .6s">' +
+        '</div>' +
+      '</div>' +
+      '<div style="margin-top:6px;font-size:12px;color:var(--text2)">Toplam ciroda ilk %' + (100 - ((genelSira-1)/tumListe.length*100)).toFixed(0) + '\'lik dilimde</div>' +
+    '</div>';
+
+  document.getElementById('hk-modal-body').innerHTML = body;
+  document.getElementById('hk-modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function hkClosePopup(e) {
+  if (e && e.target !== document.getElementById('hk-modal-overlay')) return;
+  document.getElementById('hk-modal-overlay').classList.remove('open');
+  document.body.style.overflow = '';
 }
 
 // ── SIRALAMA
