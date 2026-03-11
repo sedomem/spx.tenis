@@ -2226,8 +2226,10 @@ function hlTab(id, btn) {
 // Sütunlar: MÜŞTERİ KODU | AD SOYAD | ALIŞ | YÖNLENDİRME | TOPLAM | HAKEDİŞ % | H. PUANI
 // ════════════════════════════════════
 function buildHakedis(gvizData) {
-  var rows = gvizToRows(gvizData);
-  if (!rows || rows.length === 0) return;
+  // GViz başlık eşleşmesi güvenilmez → gvizToArr ile pozisyonel oku
+  // Sütun sırası: 0=MÜŞTERİ KODU, 1=AD SOYAD, 2=ALIŞ, 3=YÖNLENDİRME, 4=TOPLAM, 5=HAKEDİŞ %, 6=H. PUANI
+  var arr = gvizToArr(gvizData);
+  if (!arr || arr.length === 0) return;
 
   function toFloat(v) {
     if (v === null || v === undefined || v === '') return 0;
@@ -2235,29 +2237,47 @@ function buildHakedis(gvizData) {
     var n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   }
+  function toStr(v) { return v === null || v === undefined ? '' : v.toString().trim(); }
+
+  // İlk satır başlık mı kontrol et
+  var startRow = 0;
+  if (arr[0]) {
+    var first = toStr(arr[0][0]).toUpperCase();
+    if (first.indexOf('MÜŞTERI') !== -1 || first.indexOf('MUSTERI') !== -1 || first === 'KOD' || first === 'MÜŞTERİ KODU') {
+      startRow = 1;
+    }
+  }
 
   var liste = [];
-  for (var i = 0; i < rows.length; i++) {
-    var r = rows[i];
-    var kod    = (r['MÜŞTERİ KODU'] || r['MUSTERI KODU'] || r['Müşteri Kodu'] || r[0] || '').toString().trim();
-    var ad     = (r['AD SOYAD']     || r['Ad Soyad']     || r[1] || '').toString().trim();
-    var alis   = toFloat(r['ALIŞ']  || r['Alış'] || r['ALIS'] || r[2]);
-    var yon    = toFloat(r['YÖNLENDİRME'] || r['Yönlendirme'] || r['YONLENDIRME'] || r[3]);
-    var toplam = toFloat(r['TOPLAM'] || r[4]) || (alis + yon);
-    var hPct   = toFloat(r['HAKEDİŞ %'] || r['Hakediş %'] || r['HAKEDIS %'] || r[5]);
-    var puan   = toFloat(r['H. PUANI']  || r['H.PUANI']   || r['HPUANI']    || r[6]);
+  for (var i = startRow; i < arr.length; i++) {
+    var r   = arr[i] || [];
+    var kod = toStr(r[0]);
+    var ad  = toStr(r[1]);
+    if (!kod && !ad) continue;                        // boş satır
+    if (ad.toUpperCase() === 'AD SOYAD') continue;    // başlık tekrarı
 
-    // Başlık satırını atla
-    if (ad === 'AD SOYAD' || kod === 'MÜŞTERİ KODU' || (!kod && !ad)) continue;
+    var alis   = toFloat(r[2]);
+    var yon    = toFloat(r[3]);
+    var toplam = toFloat(r[4]) || (alis + yon);
+    var hPct   = toFloat(r[5]);
+    // Hakediş % bazen 0.16 (ondalık) bazen 16 (yüzde) gelebilir
+    if (hPct > 0 && hPct <= 1) hPct = hPct * 100;
+    var puan   = toFloat(r[6]);
 
     liste.push({ kod:kod, ad:ad, alis:alis, yon:yon, toplam:toplam, hPct:hPct, puan:puan });
+  }
+
+  if (liste.length === 0) {
+    document.getElementById('hk-tbody').innerHTML =
+      '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text2)">Veri yüklenemedi — Google Sheets paylaşım ayarını kontrol edin</td></tr>';
+    return;
   }
 
   // Varsayılan sıra: toplam büyükten küçüğe
   liste.sort(function(a,b){ return b.toplam - a.toplam; });
   APP._hkListe    = liste;
-  APP._hkSortKey  = 'alis';
-  APP._hkSortDir  = -1; // -1 = desc
+  APP._hkSortKey  = 'toplam';
+  APP._hkSortDir  = -1;
   APP._hkFiltered = liste.slice();
 
   // ── ÜST ÖZET KARTLARI
@@ -2281,10 +2301,10 @@ function buildHakedis(gvizData) {
   }
 
   document.getElementById('hk-ozet').innerHTML =
-    hkKart('var(--blue)',   '🛍️', 'Hoca Alış Toplamı',         fmtN(totAlis),  liste.length+' hoca') +
-    hkKart('var(--orange)', '🎾', 'Hoca Yönlendirme Toplamı',  fmtN(totYon),   liste.length+' hoca') +
-    hkKart('var(--green)',  '💰', 'Genel Toplam',               fmtN(totTop),   'Alış + Yönlendirme') +
-    hkKart('var(--accent)', '⭐', 'Toplam H. Puanı',            new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2}).format(totPuan), 'Hakediş puanı');
+    hkKart('var(--blue)',   '🛍️', 'Hoca Alış Toplamı',        fmtN(totAlis), liste.length+' hoca') +
+    hkKart('var(--orange)', '🎾', 'Hoca Yönlendirme Toplamı', fmtN(totYon),  liste.length+' hoca') +
+    hkKart('var(--green)',  '💰', 'Genel Toplam',              fmtN(totTop),  'Alış + Yönlendirme') +
+    hkKart('var(--accent)', '⭐', 'Toplam H. Puanı',           new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2}).format(totPuan), 'Hakediş puanı');
 
   hkRender();
 }
