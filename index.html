@@ -2233,7 +2233,17 @@ function buildHakedis(gvizData) {
 
   function toFloat(v) {
     if (v === null || v === undefined || v === '') return 0;
-    var s = v.toString().replace(/\./g,'').replace(',','.').replace(/[^\d.-]/g,'').trim();
+    // GViz sayısal değerleri zaten float olarak döndürür (191127.13 gibi)
+    // typeof number ise direkt kullan — string işleme yapma!
+    if (typeof v === 'number') return isNaN(v) ? 0 : v;
+    // String ise Türkçe format olabilir: "191.127,13" → 191127.13
+    var s = v.toString().trim();
+    // Eğer virgül varsa Türkçe format: nokta=binlik, virgül=ondalık
+    if (s.indexOf(',') !== -1) {
+      s = s.replace(/\./g,'').replace(',','.');
+    }
+    // Yoksa standart: nokta=ondalık (zaten doğru)
+    s = s.replace(/[^\d.-]/g,'');
     var n = parseFloat(s);
     return isNaN(n) ? 0 : n;
   }
