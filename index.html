@@ -622,7 +622,7 @@ var SHEETS = {
   aylikhedef: 'Aylık Hedef Tutma',
   kordaj:     'Kordaj Çekimleri',
   hocaliste:  'Tenis Hoca Listeleri',
-  hakedis:    'Tenis Hoca Hakediş 2025'
+  hakedis:    'Hoca Hakediş 2025'
 };
 
 // ── STATE
@@ -2239,12 +2239,22 @@ function buildHakedis(gvizData) {
   }
   function toStr(v) { return v === null || v === undefined ? '' : v.toString().trim(); }
 
-  // İlk satır başlık mı kontrol et
+  // Müşteri kodu formatını kontrol et: sayı veya "1-4-xxxxxx" formatı
+  function isKodSatiri(v) {
+    var s = toStr(v);
+    if (!s) return false;
+    // Sadece sayı veya 1-4-xxxx formatı → veri satırı
+    return /^\d/.test(s) || /^1-\d/.test(s);
+  }
+
+  // Başlık satırını atla: ilk sütun sayısal/kod formatındaki ilk satırdan başla
   var startRow = 0;
-  if (arr[0]) {
-    var first = toStr(arr[0][0]).toUpperCase();
-    if (first.indexOf('MÜŞTERI') !== -1 || first.indexOf('MUSTERI') !== -1 || first === 'KOD' || first === 'MÜŞTERİ KODU') {
-      startRow = 1;
+  for (var i = 0; i < Math.min(arr.length, 3); i++) {
+    var row0 = toStr(arr[i][0]).toUpperCase();
+    // Eğer ilk hücre "MÜŞTERİ", "MUSTERI", "KOD", "AD" gibi bir başlık metni ise atla
+    if (row0.indexOf('MÜŞTER') !== -1 || row0.indexOf('MUSTERI') !== -1 ||
+        row0 === 'KOD' || row0 === 'AD SOYAD' || row0 === 'MÜŞTERI KODU') {
+      startRow = i + 1;
     }
   }
 
@@ -2253,23 +2263,39 @@ function buildHakedis(gvizData) {
     var r   = arr[i] || [];
     var kod = toStr(r[0]);
     var ad  = toStr(r[1]);
-    if (!kod && !ad) continue;                        // boş satır
-    if (ad.toUpperCase() === 'AD SOYAD') continue;    // başlık tekrarı
 
+    // Boş satır atla
+    if (!kod && !ad) continue;
+
+    // Başlık tekrarı atla (örn. ikinci sayfada tekrar başlık yazılmışsa)
+    var kodUpper = kod.toUpperCase();
+    var adUpper  = ad.toUpperCase();
+    if (kodUpper === 'MÜŞTERİ KODU' || kodUpper === 'MUSTERI KODU' || kodUpper === 'KOD') continue;
+    if (adUpper  === 'AD SOYAD'      || adUpper  === 'AD'           || adUpper === 'ADSOYAD') continue;
+
+    // Gerçek veri satırı: kodu veya adı olan, en az bir sayısal değeri olan
     var alis   = toFloat(r[2]);
     var yon    = toFloat(r[3]);
-    var toplam = toFloat(r[4]) || (alis + yon);
-    var hPct   = toFloat(r[5]);
-    // Hakediş % bazen 0.16 (ondalık) bazen 16 (yüzde) gelebilir
-    if (hPct > 0 && hPct <= 1) hPct = hPct * 100;
-    var puan   = toFloat(r[6]);
+    var toplam = toFloat(r[4]);
+    if (toplam === 0) toplam = alis + yon;
+
+    // Tamamen sıfır bir satırı atla (muhtemelen boş/ara toplam satırı)
+    if (alis === 0 && yon === 0 && toplam === 0 && !kod) continue;
+
+    var hPct = toFloat(r[5]);
+    if (hPct > 0 && hPct <= 1) hPct = hPct * 100; // 0.16 → 16
+
+    var puan = toFloat(r[6]);
 
     liste.push({ kod:kod, ad:ad, alis:alis, yon:yon, toplam:toplam, hPct:hPct, puan:puan });
   }
 
   if (liste.length === 0) {
     document.getElementById('hk-tbody').innerHTML =
-      '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text2)">Veri yüklenemedi — Google Sheets paylaşım ayarını kontrol edin</td></tr>';
+      '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text2)">' +
+      '⚠️ Veri yüklenemedi — Sayfa adı: <b>Hoca Hakediş 2025</b><br>' +
+      '<span style="font-size:12px">Google Sheets tab adını ve paylaşım ayarını kontrol edin</span>' +
+      '</td></tr>';
     return;
   }
 
@@ -2305,6 +2331,10 @@ function buildHakedis(gvizData) {
     hkKart('var(--orange)', '🎾', 'Hoca Yönlendirme Toplamı', fmtN(totYon),  liste.length+' hoca') +
     hkKart('var(--green)',  '💰', 'Genel Toplam',              fmtN(totTop),  'Alış + Yönlendirme') +
     hkKart('var(--accent)', '⭐', 'Toplam H. Puanı',           new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2}).format(totPuan), 'Hakediş puanı');
+
+  // Sort icon başlangıç durumu
+  var sortEl = document.getElementById('hk-sort-toplam');
+  if (sortEl) sortEl.textContent = '↓';
 
   hkRender();
 }
